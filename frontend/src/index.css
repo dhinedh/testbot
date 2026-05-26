@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-wa-green: #25D366;
+  --color-wa-dark-green: #128C7E;
+  --color-wa-teal: #075E54;
+  --color-bg-light: #f0f2f5;
+  --color-bg-white: #ffffff;
+  --color-text-dark: #111b21;
+  --color-text-muted: #667781;
+  --color-border-color: #d1d7db;
+  --color-bubble-sent: #d9fdd3;
+  --color-bubble-received: #ffffff;
+  --color-danger: #ef4444;
+}
+
+@layer base {
+  body {
+    @apply bg-bg-light text-text-dark font-sans h-screen flex flex-col;
+  }
+}
