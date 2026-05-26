@@ -68,35 +68,82 @@ async function saveToCRM(phone, name, messageText) {
 }
 
 // --- Chatbot Logic ---
-function getBotReply(message, contact) {
-    if (!contact) return `I'm having trouble accessing the database. Please try again.`;
+async function sendInteractiveButtons(to, bodyText, buttonLabels) {
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    
+    const buttons = buttonLabels.map((label, index) => ({
+        type: "reply",
+        reply: {
+            id: `btn_${index + 1}`,
+            title: label.substring(0, 20)
+        }
+    }));
 
-    const msg = message.toLowerCase().trim();
+    try {
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            headers: {
+                'Authorization': `Bearer ${ACCESS_TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            data: {
+                messaging_product: 'whatsapp',
+                to: to,
+                type: 'interactive',
+                interactive: {
+                    type: 'button',
+                    body: { text: bodyText },
+                    action: { buttons }
+                }
+            }
+        });
+        console.log(`Interactive buttons sent to ${to}`);
+    } catch (error) {
+        console.error("Error sending buttons:", error.response ? error.response.data : error.message);
+    }
+}
+
+async function handleBotReply(phone, messageText, contact) {
+    if (!contact) {
+        await sendMessage(phone, `I'm having trouble accessing the database. Please try again.`);
+        return;
+    }
+
+    const msg = messageText.toLowerCase().trim();
     const isNew = contact.messageCount === 1;
 
-    const menu = `\nReply with:\n1️⃣ Services\n2️⃣ Pricing\n3️⃣ Talk to a human`;
-
-    if (isNew) {
-        return `👋 Welcome! I'm here to help.` + menu;
+    if (isNew || msg.includes("hi") || msg.includes("hello") || msg.includes("hey")) {
+        await sendInteractiveButtons(
+            phone,
+            `👋 Hello! How can I help you?`,
+            ["Services", "Pricing", "Talk to a human"]
+        );
+        return;
     }
 
-    if (msg === "1" || msg.includes("service")) {
-        return `Here are our services:\n- Web Development\n- WhatsApp Bots\n- CRM Integrations` + menu;
+    if (msg === "btn_1" || msg.includes("service")) {
+        await sendMessage(phone, `Here are our services:\n- Web Development\n- WhatsApp Bots\n- CRM Integrations`);
+        await sendInteractiveButtons(phone, `What would you like to do next?`, ["Pricing", "Talk to a human"]);
+        return;
     }
 
-    if (msg === "2" || msg.includes("price") || msg.includes("cost")) {
-        return `Our pricing is custom tailored to your needs. Starting from $99.` + menu;
+    if (msg === "btn_2" || msg.includes("price") || msg.includes("cost")) {
+        await sendMessage(phone, `Our pricing is custom tailored to your needs. Starting from $99.`);
+        await sendInteractiveButtons(phone, `Want to connect with our team?`, ["Talk to a human"]);
+        return;
     }
 
-    if (msg === "3" || msg.includes("human") || msg.includes("agent")) {
-        return `Our team will contact you shortly!`;
+    if (msg === "btn_3" || msg.includes("human") || msg.includes("agent")) {
+        await sendMessage(phone, `Our team will contact you shortly!`);
+        return;
     }
 
-    if (msg.includes("hi") || msg.includes("hello") || msg.includes("hey")) {
-        return `👋 Hello again! How can I help you?` + menu;
-    }
-
-    return `I didn't quite catch that. Here is what I can do:` + menu;
+    await sendInteractiveButtons(
+        phone,
+        `I didn't quite catch that. Here is what I can do:`,
+        ["Services", "Pricing", "Talk to a human"]
+    );
 }
 
 // --- Send Message ---
@@ -151,19 +198,22 @@ app.post('/webhook', async (req, res) => {
             const message = webhook_event.messages[0];
             const contactInfo = webhook_event.contacts && webhook_event.contacts[0] ? webhook_event.contacts[0] : null;
             
+            let messageText = '';
             if (message.type === 'text') {
+                messageText = message.text.body;
+            } else if (message.type === 'interactive' && message.interactive.button_reply) {
+                messageText = message.interactive.button_reply.id;
+            }
+
+            if (messageText) {
                 const phone = message.from;
-                const messageText = message.text.body;
                 const name = contactInfo && contactInfo.profile ? contactInfo.profile.name : '';
 
                 // Save to CRM asynchronously
                 const contact = await saveToCRM(phone, name, messageText);
                 
                 if (contact) {
-                    // Get reply
-                    const replyText = getBotReply(messageText, contact);
-                    // Send reply
-                    await sendMessage(phone, replyText);
+                    await handleBotReply(phone, messageText, contact);
                 }
             }
         }

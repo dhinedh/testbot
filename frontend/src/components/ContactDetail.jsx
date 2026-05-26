@@ -50,14 +50,34 @@ function ContactDetail({ contact, onDelete, loading }) {
       </div>
       
       <div className="flex-1 p-5 overflow-y-auto flex flex-col gap-2 z-10">
-        {contact.messages && contact.messages.map((msg, idx) => (
-          <div key={idx} className="max-w-[70%] px-3 py-2 rounded-lg text-[0.95rem] shadow-[0_1px_1px_rgba(0,0,0,0.1)] self-end bg-bubble-sent relative">
-            <span className="break-words" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br>') }} />
-            <span className="block text-[0.65rem] text-text-muted text-right mt-1">
-              {formatTime(msg.time)}
-            </span>
-          </div>
-        ))}
+        {contact.messages && contact.messages.map((msg, idx) => {
+          const isButton = msg.text && msg.text.startsWith('btn_');
+          const buttonMap = {
+            'btn_1': '✅ Services',
+            'btn_2': '✅ Pricing',
+            'btn_3': '✅ Talk to a human'
+          };
+          
+          if (isButton) {
+            return (
+              <div key={idx} className="max-w-[70%] px-4 py-1.5 rounded-full text-sm shadow-sm self-end bg-wa-teal/10 border border-wa-teal/30 text-wa-teal font-medium relative text-center mb-1">
+                {buttonMap[msg.text] || '✅ Selected Option'}
+                <span className="block text-[0.55rem] opacity-60 text-right mt-0.5">
+                  {formatTime(msg.time)}
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <div key={idx} className="max-w-[70%] px-3 py-2 rounded-lg text-[0.95rem] shadow-[0_1px_1px_rgba(0,0,0,0.1)] self-end bg-bubble-sent relative">
+              <span className="break-words" dangerouslySetInnerHTML={{ __html: msg.text.replace(/\n/g, '<br>') }} />
+              <span className="block text-[0.65rem] text-text-muted text-right mt-1">
+                {formatTime(msg.time)}
+              </span>
+            </div>
+          );
+        })}
         <div ref={chatEndRef} />
       </div>
 
