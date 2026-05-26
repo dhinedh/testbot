@@ -6,6 +6,7 @@ import ContactDetail from './components/ContactDetail';
 import { isToday } from './utils/formatters';
 
 function App() {
+  const API_URL = import.meta.env.VITE_API_URL || '';
   const [contacts, setContacts] = useState([]);
   const [currentPhone, setCurrentPhone] = useState(null);
   const [activeContactDetail, setActiveContactDetail] = useState(null);
@@ -15,7 +16,7 @@ function App() {
   // Fetch all contacts
   const fetchContacts = async () => {
     try {
-      const res = await fetch('/crm');
+      const res = await fetch(`${API_URL}/crm`);
       if (!res.ok) throw new Error('Failed to fetch CRM data');
       const data = await res.json();
       
@@ -30,7 +31,7 @@ function App() {
   const fetchContactDetail = async (phone) => {
     setDetailLoading(true);
     try {
-      const res = await fetch(`/crm/${phone}`);
+      const res = await fetch(`${API_URL}/crm/${phone}`);
       if (!res.ok) throw new Error('Contact not found');
       const data = await res.json();
       setActiveContactDetail(data);
@@ -45,7 +46,7 @@ function App() {
   // Delete contact
   const deleteContact = async (phone) => {
     try {
-      await fetch(`/crm/${phone}`, { method: 'DELETE' });
+      await fetch(`${API_URL}/crm/${phone}`, { method: 'DELETE' });
       setCurrentPhone(null);
       setActiveContactDetail(null);
       fetchContacts(); // Refresh list
@@ -63,7 +64,7 @@ function App() {
       // Also refresh active contact if selected
       if (currentPhone) {
         // use silent fetch to avoid loading flash
-        fetch(`/crm/${currentPhone}`)
+        fetch(`${API_URL}/crm/${currentPhone}`)
           .then(res => res.json())
           .then(data => setActiveContactDetail(data))
           .catch(err => console.error(err));
