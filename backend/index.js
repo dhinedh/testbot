@@ -205,6 +205,22 @@ async function handleBotReply(phone, messageText, contact) {
                 Timeline: contact.project_timeline, BudgetRange: contact.budget_range, LeadScore: contact.lead_score, LeadStatus: contact.lead_status
             }).catch(e => console.error("Webhook error"));
         }
+
+        // Push lead to Deepika CRM Supabase backend
+        axios.post(process.env.CRM_LEAD_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-lead', {
+            CustomerName: contact.name,
+            WhatsAppNumber: phone,
+            ServiceSelected: contact.selected_service,
+            AreaRequired: contact.area_required,
+            SiteLocation: contact.site_location,
+            Timeline: contact.project_timeline,
+            BudgetRange: contact.budget_range,
+            LeadScore: contact.lead_score,
+            LeadStatus: contact.lead_status || 'New'
+        })
+        .then(() => console.log(`[CRM Sync] Lead successfully synced to CRM for ${contact.name}`))
+        .catch(err => console.error(`[CRM Sync Error] Failed to push lead to CRM:`, err.message));
+
         return;
     }
 
@@ -413,6 +429,15 @@ app.post('/webhook', async (req, res) => {
             const phone = message.from;
             const name = contactInfo && contactInfo.profile ? contactInfo.profile.name : '';
             
+            // Sync enquiry immediately with Deepika CRM
+            axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
+                CustomerName: name || phone,
+                WhatsAppNumber: phone,
+                MessageText: message.type === 'text' ? message.text.body : `Selection: ${messageText}`
+            })
+            .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${phone}`))
+            .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
+
             try {
                 let contact = await Contact.findOne({ phone });
                 const now = new Date();
@@ -455,24 +480,6 @@ app.delete('/crm/:phone', async (req, res) => {
         if (result.deletedCount > 0) res.json({ success: true });
         else res.status(404).json({ error: "Contact not found" });
     } catch (err) { res.status(500).json({ error: "Failed to delete" }); }
-});
-
-app.post('/crm/:phone/remind', async (req, res) => {
-    try {
-        const contact = await Contact.findOne({ phone: req.params.phone });
-        if (!contact) return res.status(404).json({ error: "Contact not found" });
-        
-        const service = contact.selected_service || "your project";
-        const message = `👋 *Hello from Deepika Builtech Engineering!*\n\nWe noticed you enquired with us recently regarding *${service}*.\n\nOur team is ready to assist you with a free site consultation and detailed quotation. Shall we arrange a call at your convenient time?\n\nPlease reply to this message or call us at +91 96000 67611.`;
-        
-        await sendMessage(contact.phone, message);
-        
-        // Log it to the chat history
-        contact.messages.push({ text: `[SYSTEM: Manual Reminder Sent for ${service}]`, time: new Date() });
-        await contact.save();
-        
-        res.json({ success: true });
-    } catch (err) { res.status(500).json({ error: "Failed to send reminder" }); }
 });
 
 app.listen(PORT, () => {
