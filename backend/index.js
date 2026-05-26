@@ -3,9 +3,11 @@ const express = require('express');
 const axios = require('axios');
 const mongoose = require('mongoose');
 
+const path = require('path');
+
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../public')));
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
