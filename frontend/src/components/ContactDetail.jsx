@@ -1,8 +1,24 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { formatDate, formatTime, formatLastSeen } from '../utils/formatters';
 
 function ContactDetail({ contact, onDelete, loading }) {
   const chatEndRef = useRef(null);
+  const [reminderLoading, setReminderLoading] = useState(false);
+  const API_URL = import.meta.env.VITE_API_URL || '';
+
+  const handleSendReminder = async () => {
+    if (!contact) return;
+    setReminderLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/crm/${contact.phone}/remind`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to send reminder');
+      alert('Reminder sent successfully!');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setReminderLoading(false);
+    }
+  };
 
   // Auto scroll to bottom of chat
   useEffect(() => {
@@ -46,6 +62,40 @@ function ContactDetail({ contact, onDelete, loading }) {
         <div className="text-right text-xs text-text-muted space-y-1">
           <p>First seen: {formatDate(contact.firstSeen)}</p>
           <p>Last seen: {formatLastSeen(contact.lastSeen)}</p>
+        </div>
+      </div>
+      
+      {/* Lead Panel */}
+      <div className="bg-white px-5 py-3 border-b border-border-color shadow-sm z-10 flex flex-wrap gap-4 text-sm relative">
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-text-muted text-[0.65rem] uppercase tracking-wide mb-0.5">Service</p>
+          <p className="font-semibold text-text-dark">{contact.selected_service || 'Not Selected'}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-text-muted text-[0.65rem] uppercase tracking-wide mb-0.5">Location</p>
+          <p className="font-medium text-text-dark">{contact.site_location || '-'}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-text-muted text-[0.65rem] uppercase tracking-wide mb-0.5">Area</p>
+          <p className="font-medium text-text-dark">{contact.area_required || '-'}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-text-muted text-[0.65rem] uppercase tracking-wide mb-0.5">Timeline</p>
+          <p className="font-medium text-text-dark">{contact.project_timeline || '-'}</p>
+        </div>
+        <div className="flex-1 min-w-[120px]">
+          <p className="text-text-muted text-[0.65rem] uppercase tracking-wide mb-0.5">Budget</p>
+          <p className="font-medium text-text-dark">{contact.budget_range || '-'}</p>
+        </div>
+        
+        <div className="w-full flex justify-end mt-1 border-t border-border-color/50 pt-2">
+          <button 
+            onClick={handleSendReminder}
+            disabled={reminderLoading}
+            className="bg-wa-teal text-white px-4 py-1.5 rounded shadow hover:bg-[#064c44] transition-colors text-xs font-semibold disabled:opacity-50"
+          >
+            {reminderLoading ? 'Sending...' : '🔔 Send Reminder'}
+          </button>
         </div>
       </div>
       

@@ -457,6 +457,24 @@ app.delete('/crm/:phone', async (req, res) => {
     } catch (err) { res.status(500).json({ error: "Failed to delete" }); }
 });
 
+app.post('/crm/:phone/remind', async (req, res) => {
+    try {
+        const contact = await Contact.findOne({ phone: req.params.phone });
+        if (!contact) return res.status(404).json({ error: "Contact not found" });
+        
+        const service = contact.selected_service || "your project";
+        const message = `👋 *Hello from Deepika Builtech Engineering!*\n\nWe noticed you enquired with us recently regarding *${service}*.\n\nOur team is ready to assist you with a free site consultation and detailed quotation. Shall we arrange a call at your convenient time?\n\nPlease reply to this message or call us at +91 96000 67611.`;
+        
+        await sendMessage(contact.phone, message);
+        
+        // Log it to the chat history
+        contact.messages.push({ text: `[SYSTEM: Manual Reminder Sent for ${service}]`, time: new Date() });
+        await contact.save();
+        
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: "Failed to send reminder" }); }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
