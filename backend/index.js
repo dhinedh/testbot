@@ -304,7 +304,7 @@ async function handleBotReply(phone, messageText, contact) {
     }
 
     // Fallback
-    await sendMessage(phone, `😊 *Thank you for your message!*\n\nI didn't quite understand that. Let me show you our main menu so I can help you better.\n\n*1️⃣ About Us*\n*2️⃣ Our Services*\n*3️⃣ Get a Free Quote*\n*4️⃣ Contact & Locations*\n*5️⃣ 💬 Talk to a Human*\n\n_Reply with a number_`);
+    await sendInteractiveButtons(phone, `😊 *Thank you for your message!*\n\nI didn't quite understand that. Let me show you our main menu so I can help you better.\n\n*1️⃣ About Us*\n*2️⃣ Our Services*\n*3️⃣ Get a Free Quote*\n*4️⃣ Contact & Locations*\n*5️⃣ 💬 Talk to a Human*\n\n_Reply with a number or tap a button_ 👇`, ["Main Menu", "Get Free Quote", "Talk to Human"]);
 }
 
 // --- Cron Jobs for Automated Follow-ups ---
