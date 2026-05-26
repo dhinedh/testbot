@@ -84,6 +84,32 @@ async function sendInteractiveButtons(to, bodyText, buttonLabels) {
     }
 }
 
+async function sendInteractiveList(to, bodyText, buttonText, sections) {
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    try {
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+            data: {
+                messaging_product: 'whatsapp',
+                to: to,
+                type: 'interactive',
+                interactive: { 
+                    type: 'list', 
+                    body: { text: bodyText }, 
+                    action: { 
+                        button: buttonText.substring(0, 20),
+                        sections: sections
+                    } 
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error sending list:", error.response ? error.response.data : error.message);
+    }
+}
+
 // --- Lead Scoring ---
 function calculateLeadScore(contact) {
     let score = 0;
@@ -196,7 +222,33 @@ async function handleBotReply(phone, messageText, contact) {
     }
 
     if (msg === "btn_2" || msg === "2" || msg.includes("service") || msg === "view services") {
-        await sendMessage(phone, `🔧 *Our Services*\n\nWe specialise in the following construction services across Tamil Nadu.\n\nSelect a service to know more:\n\n*1️⃣ 🏗️ PEB Structure*\n*2️⃣ 📦 Mezzanine Floor*\n*3️⃣ ❄️ Cold Storage*\n*4️⃣ 🏚️ Shed Fabrication*\n*5️⃣ 🏭 Godown Construction*\n*6️⃣ 🧱 Civil Construction*\n*7️⃣ 📋 Get a Free Quote*\n\n_Reply with a number to learn more_ 👇`);
+        const sections = [
+            {
+                title: "Construction Services",
+                rows: [
+                    { id: "srv_peb", title: "🏗️ PEB Structure", description: "Pre-Engineered Buildings" },
+                    { id: "srv_mezzanine", title: "📦 Mezzanine Floor", description: "Custom space expansion" },
+                    { id: "srv_cold", title: "❄️ Cold Storage", description: "Insulated facilities" },
+                    { id: "srv_shed", title: "🏚️ Shed Fabrication", description: "Industrial sheds" },
+                    { id: "srv_godown", title: "🏭 Godown Construction", description: "Large warehouses" },
+                    { id: "srv_civil", title: "🧱 Civil Construction", description: "Foundation & RC works" }
+                ]
+            },
+            {
+                title: "Actions",
+                rows: [
+                    { id: "srv_quote", title: "📋 Get a Free Quote" },
+                    { id: "srv_menu", title: "🏠 Main Menu" }
+                ]
+            }
+        ];
+
+        await sendInteractiveList(
+            phone, 
+            `🔧 *Our Services*\n\nWe specialise in the following construction services across Tamil Nadu.\n\nTap the button below to view and select a service:`, 
+            "View Services", 
+            sections
+        );
         return;
     }
 
@@ -206,39 +258,39 @@ async function handleBotReply(phone, messageText, contact) {
     }
 
     // Services Selection (1 to 6 from services menu)
-    if (msg.includes("peb")) {
+    if (msg === "srv_peb" || msg.includes("peb")) {
         contact.selected_service = "PEB Structure"; await contact.save();
         await sendInteractiveButtons(phone, `🏗️ *Pre-Engineered Buildings (PEB)*\n\nThe fastest, strongest, and most cost-effective way to build your factory, warehouse, or industrial facility.\n\n💡 *Why Choose PEB Over RCC?*\n✅ 30–40% cheaper than RCC construction\n✅ Built and ready in just 30–45 days\n✅ Earthquake and cyclone resistant\n✅ Fully customisable — any span, height or layout\n✅ Low maintenance — long-lasting galvanised steel\n✅ Future-ready — easily expandable\n\n🏭 *Best Suited For:*\nFactories · Warehouses · Industrial Sheds · Distribution Centres · Manufacturing Plants · Steel Buildings\n\n📌 We handle everything:\nDesign → Fabrication → Transport → Erection → Handover\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
-    if (msg.includes("mezzanine")) {
+    if (msg === "srv_mezzanine" || msg.includes("mezzanine")) {
         contact.selected_service = "Mezzanine Floor"; await contact.save();
         await sendInteractiveButtons(phone, `📦 *Mezzanine Floor Construction*\n\nMaximise your existing space without building a new facility. A mezzanine floor doubles your usable area at a fraction of the cost.\n\n✅ Custom designed for your exact space\n✅ Heavy load-bearing structural capacity\n✅ Safe staircase and handrail included\n✅ Quick installation with minimal disruption\n✅ Perfect for storage, offices or production\n\n💡 *Did You Know?*\nA well-designed mezzanine can give you 70–80% extra usable space within your existing building!\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
-    if (msg.includes("cold") || msg.includes("storage")) {
+    if (msg === "srv_cold" || msg.includes("cold") || msg.includes("storage")) {
         contact.selected_service = "Cold Storage"; await contact.save();
         await sendInteractiveButtons(phone, `❄️ *Cold Storage Construction*\n\nWe design and build insulated cold storage facilities engineered for precise temperature control and maximum energy efficiency.\n\n✅ PUF panel insulated walls, floors and ceiling\n✅ Single and multi-temperature chamber options\n✅ Blast freezer and chilling room combinations\n✅ Designed for FSSAI and food safety compliance\n✅ Integrated refrigeration system support\n✅ Anti-condensation and drainage systems\n\n🏭 *Best For:*\nFood Processing · Pharmaceuticals · Dairy · Seafood · Agriculture · Vegetables and Fruits\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
-    if (msg.includes("shed")) {
+    if (msg === "srv_shed" || msg.includes("shed")) {
         contact.selected_service = "Shed Fabrication"; await contact.save();
         await sendInteractiveButtons(phone, `🏚️ *Shed Fabrication*\n\nWe fabricate and erect high-quality industrial sheds for workshops, storage, vehicle parking, and light manufacturing operations.\n\n✅ MS and galvanised steel fabrication\n✅ Custom size and height options\n✅ Fast erection — minimal site time\n✅ Roofing sheet options — GI, colour coated\n✅ Side cladding and ventilation included\n✅ Strong and durable — built to last 25+ years\n\n💡 *Ideal for:*\nVehicle Sheds · Tool Rooms · Small Workshops · Agricultural Storage · Pump Houses\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
-    if (msg.includes("godown")) {
+    if (msg === "srv_godown" || msg.includes("godown")) {
         contact.selected_service = "Godown Construction"; await contact.save();
         await sendInteractiveButtons(phone, `🏭 *Godown Construction*\n\nWe build robust, large-span godowns and warehouses for commercial and industrial storage operations across Tamil Nadu.\n\n✅ Clear span up to 60+ metres — no interior columns\n✅ High-bay storage compatible design\n✅ Natural ventilation and lighting options\n✅ Dock levellers and loading bay options\n✅ Fire safety and sprinkler ready\n✅ Completed in 45–60 days\n\n💡 *Perfect For:*\nFMCG Storage · Logistics Hubs · Raw Material Storage · Finished Goods · E-Commerce Fulfilment Centres\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
-    if (msg.includes("civil")) {
+    if (msg === "srv_civil" || msg.includes("civil")) {
         contact.selected_service = "Civil Construction"; await contact.save();
         await sendInteractiveButtons(phone, `🧱 *Civil Construction*\n\nWe provide complete civil construction services alongside our PEB and steel fabrication work — giving you one trusted contractor for your entire project.\n\n✅ Foundation and footing works\n✅ RCC column and slab construction\n✅ Compound wall and boundary wall\n✅ Office block and admin building\n✅ Toilet block and utility construction\n✅ Flooring — plain cement and epoxy\n\n💡 *Advantage:*\nWhen you combine our civil and PEB services, you get seamless coordination, single-point accountability, and significant cost savings.\n\nInterested in a free estimate?`, ["Yes-Get Free Quote", "Back to Services", "Main Menu"]);
         return;
     }
 
     // Trigger Quote Flow (from "3" in main menu, or "Get Free Quote" button)
-    if (msg === "btn_3" || msg === "3" || msg.includes("quote") || msg.includes("yes")) {
+    if (msg === "srv_quote" || msg === "btn_3" || msg === "3" || msg.includes("quote") || msg.includes("yes")) {
         contact.quote_step = 1;
         if (!contact.selected_service) contact.selected_service = "PEB / General Enquiry";
         await contact.save();
@@ -246,7 +298,7 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    if (msg.includes("main menu") || msg.includes("back to")) {
+    if (msg === "srv_menu" || msg.includes("main menu") || msg.includes("back to")) {
         await sendInteractiveButtons(phone, `Main Menu`, ["1 - About Us", "2 - Services", "3 - Free Quote"]);
         return;
     }
@@ -308,7 +360,10 @@ app.post('/webhook', async (req, res) => {
         
         let messageText = '';
         if (message.type === 'text') messageText = message.text.body;
-        else if (message.type === 'interactive' && message.interactive.button_reply) messageText = message.interactive.button_reply.id;
+        else if (message.type === 'interactive') {
+            if (message.interactive.button_reply) messageText = message.interactive.button_reply.id;
+            else if (message.interactive.list_reply) messageText = message.interactive.list_reply.id;
+        }
 
         if (messageText) {
             const phone = message.from;
