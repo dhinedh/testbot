@@ -108,7 +108,7 @@ async function sendMessage(to, text) {
     try {
         await axios({
             method: 'POST',
-            url: `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`,
+            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
             headers: {
                 'Authorization': `Bearer ${ACCESS_TOKEN}`,
                 'Content-Type': 'application/json'
