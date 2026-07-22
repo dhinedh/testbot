@@ -663,10 +663,11 @@ app.post('/webhook', async (req, res) => {
             const name = contactInfo && contactInfo.profile ? contactInfo.profile.name : '';
             
             // Sync enquiry immediately with Deepika CRM
-            axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
+            axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'https://deepika-builtech-crm-4jj1.onrender.com/api/webhooks/whatsapp-bot-enquiry', {
                 CustomerName: name || phone,
                 WhatsAppNumber: phone,
-                MessageText: message.type === 'text' ? message.text.body : `Selection: ${messageText}`
+                MessageText: message.type === 'text' ? message.text.body : `Selection: ${messageText}`,
+                SourceChannel: 'WhatsApp'
             })
             .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${phone}`))
             .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
@@ -763,10 +764,11 @@ app.post('/webhook', async (req, res) => {
                     await contact.save();
 
                     // Sync enquiry immediately with Deepika CRM
-                    axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
+                    axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'https://deepika-builtech-crm-4jj1.onrender.com/api/webhooks/whatsapp-bot-enquiry', {
                         CustomerName: contact.name,
                         WhatsAppNumber: unifiedPhoneId,
-                        MessageText: (messaging.message && messaging.message.quick_reply) || messaging.postback ? `Selection: ${messageText}` : messageText
+                        MessageText: (messaging.message && messaging.message.quick_reply) || messaging.postback ? `Selection: ${messageText}` : messageText,
+                        SourceChannel: platform === 'facebook' ? 'Facebook Messenger' : 'Instagram Direct'
                     })
                     .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${unifiedPhoneId}`))
                     .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
