@@ -569,53 +569,67 @@ app.post('/webhook', async (req, res) => {
     }
 
     // 2. Facebook Messenger / Instagram DM Webhook Entry
-    if ((body.object === 'page' || body.object === 'instagram') && body.entry && body.entry[0].messaging && body.entry[0].messaging[0] && body.entry[0].messaging[0].message) {
-        const messaging = body.entry[0].messaging[0];
-        const senderId = messaging.sender?.id;
+    if ((body.object === 'page' || body.object === 'instagram') && Array.isArray(body.entry)) {
         const platform = body.object === 'page' ? 'facebook' : 'instagram';
-        const unifiedPhoneId = platform === 'facebook' ? `fb:${senderId}` : `ig:${senderId}`;
 
-        let messageText = '';
-        if (messaging.message.quick_reply) {
-            messageText = messaging.message.quick_reply.payload;
-        } else if (messaging.message.text) {
-            messageText = messaging.message.text;
-        }
+        for (const entry of body.entry) {
+            const messagingList = entry.messaging || entry.standby || [];
+            for (const messaging of messagingList) {
+                // Ignore echoes (messages sent by Page or IG account itself)
+                if (messaging.message && messaging.message.is_echo) continue;
 
-        if (messageText && senderId) {
-            try {
-                let contact = await Contact.findOne({ phone: unifiedPhoneId });
-                const now = new Date();
-                if (!contact) {
-                    const profileName = await getMetaUserProfile(senderId, platform);
-                    const displayName = profileName || (platform === 'facebook' ? 'Facebook Customer' : 'Instagram Customer');
-                    contact = new Contact({ 
-                        phone: unifiedPhoneId, 
-                        name: displayName, 
-                        firstSeen: now, 
-                        lastSeen: now, 
-                        messageCount: 1, 
-                        messages: [{ text: messageText, time: now }] 
-                    });
-                } else {
-                    contact.lastSeen = now;
-                    contact.messageCount += 1;
-                    contact.messages.push({ text: messageText, time: now });
+                const senderId = messaging.sender && messaging.sender.id;
+                if (!senderId) continue;
+
+                let messageText = '';
+                if (messaging.postback && messaging.postback.payload) {
+                    messageText = messaging.postback.payload;
+                } else if (messaging.postback && messaging.postback.title) {
+                    messageText = messaging.postback.title;
+                } else if (messaging.message && messaging.message.quick_reply) {
+                    messageText = messaging.message.quick_reply.payload;
+                } else if (messaging.message && messaging.message.text) {
+                    messageText = messaging.message.text;
                 }
-                await contact.save();
 
-                // Sync enquiry immediately with Deepika CRM
-                axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
-                    CustomerName: contact.name,
-                    WhatsAppNumber: unifiedPhoneId,
-                    MessageText: messaging.message.quick_reply ? `Selection: ${messageText}` : messageText
-                })
-                .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${unifiedPhoneId}`))
-                .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
+                if (!messageText) continue;
 
-                await handleBotReply(unifiedPhoneId, messageText, contact);
-            } catch (e) {
-                console.error("DB Error processing Meta webhook:", e);
+                const unifiedPhoneId = platform === 'facebook' ? `fb:${senderId}` : `ig:${senderId}`;
+
+                try {
+                    let contact = await Contact.findOne({ phone: unifiedPhoneId });
+                    const now = new Date();
+                    if (!contact) {
+                        const profileName = await getMetaUserProfile(senderId, platform);
+                        const displayName = profileName || (platform === 'facebook' ? `Facebook Lead (${senderId.slice(-4)})` : `Instagram Lead (${senderId.slice(-4)})`);
+                        contact = new Contact({ 
+                            phone: unifiedPhoneId, 
+                            name: displayName, 
+                            firstSeen: now, 
+                            lastSeen: now, 
+                            messageCount: 1, 
+                            messages: [{ text: messageText, time: now }] 
+                        });
+                    } else {
+                        contact.lastSeen = now;
+                        contact.messageCount += 1;
+                        contact.messages.push({ text: messageText, time: now });
+                    }
+                    await contact.save();
+
+                    // Sync enquiry immediately with Deepika CRM
+                    axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
+                        CustomerName: contact.name,
+                        WhatsAppNumber: unifiedPhoneId,
+                        MessageText: (messaging.message && messaging.message.quick_reply) || messaging.postback ? `Selection: ${messageText}` : messageText
+                    })
+                    .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${unifiedPhoneId}`))
+                    .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
+
+                    await handleBotReply(unifiedPhoneId, messageText, contact);
+                } catch (e) {
+                    console.error("DB Error processing Meta webhook:", e);
+                }
             }
         }
     }

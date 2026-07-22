@@ -20,29 +20,38 @@ function ContactList({ contacts, currentPhone, onSelectContact, searchQuery, onS
         ) : (
           contacts.map(contact => {
             const isActive = currentPhone === contact.phone;
-            const avatarLetter = contact.name ? contact.name.charAt(0).toUpperCase() : 'W';
-            
+            const isIG = contact.phone.startsWith('ig:');
+            const isFB = contact.phone.startsWith('fb:');
+
+            const avatarLetter = contact.name ? contact.name.charAt(0).toUpperCase() : (isIG ? 'I' : isFB ? 'F' : 'W');
+            const avatarBg = isIG ? 'bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600' : isFB ? 'bg-blue-600' : 'bg-wa-green';
+            const displayId = isIG ? `IG: ${contact.phone.replace('ig:', '')}` : isFB ? `FB: ${contact.phone.replace('fb:', '')}` : `+${contact.phone}`;
+            const channelBadge = isIG ? '📸 Instagram' : isFB ? '💬 Messenger' : '🟢 WhatsApp';
+
             return (
               <div 
                 key={contact.phone}
                 onClick={() => onSelectContact(contact.phone)}
                 className={`flex p-3 cursor-pointer border-b border-bg-light transition-colors ${isActive ? 'bg-bg-light' : 'hover:bg-bg-light'}`}
               >
-                <div className="w-11 h-11 rounded-full bg-wa-green text-white flex items-center justify-center font-bold text-lg mr-4 shrink-0">
+                <div className={`w-11 h-11 rounded-full ${avatarBg} text-white flex items-center justify-center font-bold text-lg mr-4 shrink-0 shadow-sm`}>
                   {avatarLetter}
                 </div>
                 <div className="flex-1 min-w-0 flex flex-col justify-center">
                   <div className="flex justify-between items-baseline mb-1">
-                    <span className="font-semibold truncate text-text-dark">{contact.name || contact.phone}</span>
+                    <span className="font-semibold truncate text-text-dark">{contact.name || displayId}</span>
                     <span className="text-xs text-text-muted whitespace-nowrap ml-2">
                       {formatLastSeen(contact.lastSeen)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-text-muted truncate">+{contact.phone}</span>
-                    <span className="bg-wa-green text-white text-[10px] py-0.5 px-2 rounded-full font-bold">
-                      {contact.messageCount} msgs
-                    </span>
+                    <span className="text-xs text-text-muted truncate">{displayId}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded font-medium border border-gray-200">{channelBadge}</span>
+                      <span className="bg-wa-green text-white text-[10px] py-0.5 px-2 rounded-full font-bold">
+                        {contact.messageCount} msgs
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
