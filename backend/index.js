@@ -102,6 +102,47 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
         return;
     }
     const rawId = to.replace(/^(fb:|ig:)/, '');
+
+    const primaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.instagram.com/v20.0/me/messages`
+        : `https://graph.facebook.com/v20.0/me/messages`;
+    const secondaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.facebook.com/v20.0/me/messages`
+        : `https://graph.instagram.com/v20.0/me/messages`;
+
+    // For Facebook Messenger, try Button Template first for in-bubble buttons
+    if (!isIG && buttonsArray.length <= 3) {
+        const buttonTemplateData = {
+            recipient: { id: rawId },
+            message: {
+                attachment: {
+                    type: "template",
+                    payload: {
+                        template_type: "button",
+                        text: bodyText.length > 630 ? bodyText.substring(0, 630) + '...' : bodyText,
+                        buttons: buttonsArray.map(btn => ({
+                            type: "postback",
+                            title: btn.title.substring(0, 20),
+                            payload: btn.id
+                        }))
+                    }
+                }
+            }
+        };
+
+        try {
+            await axios.post(primaryUrl, buttonTemplateData, {
+                params: { access_token: token },
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+            console.log(`✅ [Meta Button Template Sent] Successfully sent buttons to ${to}`);
+            return;
+        } catch (err) {
+            console.warn(`[Meta Button Template Fallback] Retrying with Quick Replies for ${to}:`, err.response ? err.response.data : err.message);
+        }
+    }
+
+    // Quick Replies format (for Instagram or fallback)
     const quick_replies = buttonsArray.map((btn) => ({
         content_type: "text",
         title: btn.title.substring(0, 20),
@@ -114,13 +155,6 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
             quick_replies: quick_replies
         }
     };
-
-    const primaryUrl = (isIG && token.startsWith('IGAA'))
-        ? `https://graph.instagram.com/v20.0/me/messages`
-        : `https://graph.facebook.com/v20.0/me/messages`;
-    const secondaryUrl = (isIG && token.startsWith('IGAA'))
-        ? `https://graph.facebook.com/v20.0/me/messages`
-        : `https://graph.instagram.com/v20.0/me/messages`;
 
     try {
         await axios.post(primaryUrl, data, {
