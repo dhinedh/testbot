@@ -176,32 +176,48 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
 }
 
 async function getMetaUserProfile(senderId, platform) {
-    const token = getMetaToken(platform);
-    if (!token) return null;
-    const baseUrl = (platform === 'instagram' && token.startsWith('IGAA'))
-        ? `https://graph.instagram.com/v20.0/${senderId}`
-        : `https://graph.facebook.com/v20.0/${senderId}`;
+    const pageToken = (process.env.PAGE_ACCESS_TOKEN || process.env.ACCESS_TOKEN || '').trim().replace(/^["']|["']$/g, '');
+    const igToken = (process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || pageToken).trim().replace(/^["']|["']$/g, '');
 
-    try {
-        if (platform === 'facebook') {
-            const res = await axios.get(baseUrl, {
-                params: { fields: 'first_name,last_name' },
-                headers: { 'Authorization': `Bearer ${token}` }
+    if (platform === 'facebook' && pageToken) {
+        try {
+            const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+                params: { fields: 'first_name,last_name,name', access_token: pageToken }
             });
-            if (res.data && (res.data.first_name || res.data.last_name)) {
-                return `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim();
+            if (res.data && (res.data.name || res.data.first_name || res.data.last_name)) {
+                return res.data.name || `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim();
             }
-        } else if (platform === 'instagram') {
-            const res = await axios.get(baseUrl, {
-                params: { fields: 'username,name' },
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.data) {
-                return res.data.name || res.data.username || null;
+        } catch (e) {
+            console.warn(`[FB Profile Fetch Error] ${senderId}: ${e.message}`);
+        }
+    } else if (platform === 'instagram') {
+        // Try Meta Graph API with Page Token
+        if (pageToken) {
+            try {
+                const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+                    params: { fields: 'name,username', access_token: pageToken }
+                });
+                if (res.data && (res.data.username || res.data.name)) {
+                    return res.data.username ? `@${res.data.username}${res.data.name ? ` (${res.data.name})` : ''}` : res.data.name;
+                }
+            } catch (e) {
+                console.warn(`[IG FB-Graph Fetch Failed] ${senderId}: ${e.message}`);
             }
         }
-    } catch (err) {
-        console.warn(`[Meta Profile Fetch Failed] senderId: ${senderId}, platform: ${platform}, error: ${err.message}`);
+
+        // Try Instagram API with IG Token
+        if (igToken) {
+            try {
+                const res = await axios.get(`https://graph.instagram.com/v20.0/${senderId}`, {
+                    params: { fields: 'username,name', access_token: igToken }
+                });
+                if (res.data && (res.data.username || res.data.name)) {
+                    return res.data.username ? `@${res.data.username}${res.data.name ? ` (${res.data.name})` : ''}` : res.data.name;
+                }
+            } catch (e) {
+                console.warn(`[IG Direct Fetch Failed] ${senderId}: ${e.message}`);
+            }
+        }
     }
     return null;
 }
@@ -725,7 +741,8 @@ app.post('/webhook', async (req, res) => {
                     const now = new Date();
                     if (!contact) {
                         const profileName = await getMetaUserProfile(senderId, platform);
-                        const displayName = profileName || (platform === 'facebook' ? `Facebook Lead (${senderId.slice(-4)})` : `Instagram Lead (${senderId.slice(-4)})`);
+                        const fallbackName = platform === 'facebook' ? `Facebook User (${senderId.slice(-6)})` : `Instagram User (${senderId.slice(-6)})`;
+                        const displayName = profileName || fallbackName;
                         contact = new Contact({ 
                             phone: unifiedPhoneId, 
                             name: displayName, 
@@ -737,6 +754,10 @@ app.post('/webhook', async (req, res) => {
                     } else {
                         contact.lastSeen = now;
                         contact.messageCount += 1;
+                        if (!contact.name || contact.name.includes('Lead') || contact.name.includes('Customer') || contact.name.startsWith('ig:') || contact.name.startsWith('fb:')) {
+                            const updatedProfile = await getMetaUserProfile(senderId, platform);
+                            if (updatedProfile) contact.name = updatedProfile;
+                        }
                         contact.messages.push({ text: messageText, time: now });
                     }
                     await contact.save();
