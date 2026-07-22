@@ -575,12 +575,27 @@ app.post('/webhook', async (req, res) => {
         const platform = body.object === 'page' ? 'facebook' : 'instagram';
 
         for (const entry of body.entry) {
-            const messagingList = entry.messaging || entry.standby || [];
+            // Build unified list of messaging events (from entry.messaging, entry.standby, or entry.changes)
+            const messagingList = [];
+            if (entry.messaging && Array.isArray(entry.messaging)) {
+                messagingList.push(...entry.messaging);
+            }
+            if (entry.standby && Array.isArray(entry.standby)) {
+                messagingList.push(...entry.standby);
+            }
+            if (entry.changes && Array.isArray(entry.changes)) {
+                for (const change of entry.changes) {
+                    if (change.field === 'messages' && change.value) {
+                        messagingList.push(change.value);
+                    }
+                }
+            }
+
             for (const messaging of messagingList) {
                 // Ignore echoes (messages sent by Page or IG account itself)
                 if (messaging.message && messaging.message.is_echo) continue;
 
-                const senderId = messaging.sender && messaging.sender.id;
+                const senderId = (messaging.sender && messaging.sender.id) || (messaging.from && (messaging.from.id || messaging.from));
                 if (!senderId) continue;
 
                 let messageText = '';
@@ -592,11 +607,14 @@ app.post('/webhook', async (req, res) => {
                     messageText = messaging.message.quick_reply.payload;
                 } else if (messaging.message && messaging.message.text) {
                     messageText = messaging.message.text;
+                } else if (messaging.text) {
+                    messageText = messaging.text;
                 }
 
                 if (!messageText) continue;
 
                 const unifiedPhoneId = platform === 'facebook' ? `fb:${senderId}` : `ig:${senderId}`;
+                console.log(`💬 [Meta DM Received] Platform: ${platform}, Sender: ${senderId}, Text: "${messageText}"`);
 
                 try {
                     let contact = await Contact.findOne({ phone: unifiedPhoneId });
