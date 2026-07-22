@@ -17,13 +17,12 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-c
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
 
-function getMetaToken() {
-    const igToken = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
-    if (igToken) {
-        return igToken.trim().replace(/^["']|["']$/g, '');
+function getMetaToken(platform) {
+    if (platform === 'facebook' && process.env.PAGE_ACCESS_TOKEN) {
+        return process.env.PAGE_ACCESS_TOKEN.trim().replace(/^["']|["']$/g, '');
     }
-    const fallback = process.env.ACCESS_TOKEN || '';
-    return fallback.trim().replace(/^["']|["']$/g, '');
+    const token = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.PAGE_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || process.env.ACCESS_TOKEN || '';
+    return token.trim().replace(/^["']|["']$/g, '');
 }
 
 // --- MongoDB Setup ---
@@ -56,11 +55,8 @@ const Contact = mongoose.model('Contact', contactSchema);
 
 // --- Meta Send API Helpers for Facebook Messenger & Instagram DM ---
 async function sendMetaMessage(to, text) {
-    const token = getMetaToken();
-    const hasIgToken = !!(process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN);
-    if (!hasIgToken) {
-        console.warn('⚠️ [Meta Token Warning] INSTAGRAM_ACCESS_TOKEN environment variable is NOT set on server! Falling back to ACCESS_TOKEN.');
-    }
+    const isIG = to.startsWith('ig:');
+    const token = getMetaToken(isIG ? 'instagram' : 'facebook');
     if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
@@ -71,19 +67,27 @@ async function sendMetaMessage(to, text) {
         message: { text: text }
     };
 
+    // If Instagram token starts with IGAA, try Instagram Graph API first
+    const primaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.instagram.com/v20.0/me/messages`
+        : `https://graph.facebook.com/v20.0/me/messages`;
+    const secondaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.facebook.com/v20.0/me/messages`
+        : `https://graph.instagram.com/v20.0/me/messages`;
+
     try {
-        await axios.post(`https://graph.facebook.com/v20.0/me/messages`, data, {
+        await axios.post(primaryUrl, data, {
             params: { access_token: token },
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         console.log(`✅ [Meta DM Sent] Successfully sent message to ${to}`);
     } catch (error) {
         try {
-            await axios.post(`https://graph.instagram.com/v20.0/me/messages`, data, {
+            await axios.post(secondaryUrl, data, {
                 params: { access_token: token },
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            console.log(`✅ [Meta DM Sent via IG API] Successfully sent message to ${to}`);
+            console.log(`✅ [Meta DM Sent via fallback API] Successfully sent message to ${to}`);
         } catch (err2) {
             console.error(`Error sending Meta message to ${to}:`, error.response ? error.response.data : error.message);
         }
@@ -91,11 +95,8 @@ async function sendMetaMessage(to, text) {
 }
 
 async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
-    const token = getMetaToken();
-    const hasIgToken = !!(process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN);
-    if (!hasIgToken) {
-        console.warn('⚠️ [Meta Token Warning] INSTAGRAM_ACCESS_TOKEN environment variable is NOT set on server! Falling back to ACCESS_TOKEN.');
-    }
+    const isIG = to.startsWith('ig:');
+    const token = getMetaToken(isIG ? 'instagram' : 'facebook');
     if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
@@ -114,19 +115,26 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
         }
     };
 
+    const primaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.instagram.com/v20.0/me/messages`
+        : `https://graph.facebook.com/v20.0/me/messages`;
+    const secondaryUrl = (isIG && token.startsWith('IGAA'))
+        ? `https://graph.facebook.com/v20.0/me/messages`
+        : `https://graph.instagram.com/v20.0/me/messages`;
+
     try {
-        await axios.post(`https://graph.facebook.com/v20.0/me/messages`, data, {
+        await axios.post(primaryUrl, data, {
             params: { access_token: token },
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
         });
         console.log(`✅ [Meta QuickReplies Sent] Successfully sent buttons to ${to}`);
     } catch (error) {
         try {
-            await axios.post(`https://graph.instagram.com/v20.0/me/messages`, data, {
+            await axios.post(secondaryUrl, data, {
                 params: { access_token: token },
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            console.log(`✅ [Meta QuickReplies Sent via IG API] Successfully sent buttons to ${to}`);
+            console.log(`✅ [Meta QuickReplies Sent via fallback API] Successfully sent buttons to ${to}`);
         } catch (err2) {
             console.error(`Error sending Meta quick replies to ${to}:`, error.response ? error.response.data : error.message);
         }
@@ -134,11 +142,15 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
 }
 
 async function getMetaUserProfile(senderId, platform) {
-    const token = getMetaToken();
+    const token = getMetaToken(platform);
     if (!token) return null;
+    const baseUrl = (platform === 'instagram' && token.startsWith('IGAA'))
+        ? `https://graph.instagram.com/v20.0/${senderId}`
+        : `https://graph.facebook.com/v20.0/${senderId}`;
+
     try {
         if (platform === 'facebook') {
-            const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+            const res = await axios.get(baseUrl, {
                 params: { fields: 'first_name,last_name' },
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -146,7 +158,7 @@ async function getMetaUserProfile(senderId, platform) {
                 return `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim();
             }
         } else if (platform === 'instagram') {
-            const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+            const res = await axios.get(baseUrl, {
                 params: { fields: 'username,name' },
                 headers: { 'Authorization': `Bearer ${token}` }
             });
