@@ -11,12 +11,16 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || ACCESS_TOKEN;
+const ACCESS_TOKEN = (process.env.ACCESS_TOKEN || '').trim().replace(/^["']|["']$/g, '');
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-crm';
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
+
+function getMetaToken() {
+    const raw = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || process.env.ACCESS_TOKEN || '';
+    return raw.trim().replace(/^["']|["']$/g, '');
+}
 
 // --- MongoDB Setup ---
 mongoose.connect(MONGO_URI)
@@ -48,7 +52,8 @@ const Contact = mongoose.model('Contact', contactSchema);
 
 // --- Meta Send API Helpers for Facebook Messenger & Instagram DM ---
 async function sendMetaMessage(to, text) {
-    if (!INSTAGRAM_ACCESS_TOKEN) {
+    const token = getMetaToken();
+    if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
     }
@@ -57,20 +62,24 @@ async function sendMetaMessage(to, text) {
         await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/me/messages`,
-            params: { access_token: INSTAGRAM_ACCESS_TOKEN },
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Authorization': `Bearer ${token}`, 
+                'Content-Type': 'application/json' 
+            },
             data: {
                 recipient: { id: rawId },
                 message: { text: text }
             }
         });
+        console.log(`✅ [Meta DM Sent] Successfully sent message to ${to}`);
     } catch (error) {
         console.error(`Error sending Meta message to ${to}:`, error.response ? error.response.data : error.message);
     }
 }
 
 async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
-    if (!INSTAGRAM_ACCESS_TOKEN) {
+    const token = getMetaToken();
+    if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
     }
@@ -85,8 +94,10 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
         await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/me/messages`,
-            params: { access_token: INSTAGRAM_ACCESS_TOKEN },
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Authorization': `Bearer ${token}`, 
+                'Content-Type': 'application/json' 
+            },
             data: {
                 recipient: { id: rawId },
                 message: {
@@ -95,30 +106,28 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
                 }
             }
         });
+        console.log(`✅ [Meta QuickReplies Sent] Successfully sent buttons to ${to}`);
     } catch (error) {
         console.error(`Error sending Meta quick replies to ${to}:`, error.response ? error.response.data : error.message);
     }
 }
 
 async function getMetaUserProfile(senderId, platform) {
-    if (!INSTAGRAM_ACCESS_TOKEN) return null;
+    const token = getMetaToken();
+    if (!token) return null;
     try {
         if (platform === 'facebook') {
             const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
-                params: {
-                    fields: 'first_name,last_name',
-                    access_token: INSTAGRAM_ACCESS_TOKEN
-                }
+                params: { fields: 'first_name,last_name' },
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.data && (res.data.first_name || res.data.last_name)) {
                 return `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim();
             }
         } else if (platform === 'instagram') {
             const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
-                params: {
-                    fields: 'username,name',
-                    access_token: INSTAGRAM_ACCESS_TOKEN
-                }
+                params: { fields: 'username,name' },
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.data) {
                 return res.data.name || res.data.username || null;
