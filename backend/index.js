@@ -336,35 +336,43 @@ async function handleBotReply(phone, messageText, contact) {
 
     // --- QUOTE COLLECTION FLOW ---
     if (contact.quote_step === 1) {
-        contact.area_required = messageText;
+        contact.name = messageText;
         contact.quote_step = 2;
         await contact.save();
-        await sendMessage(phone, `✅ Thank you!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 2 of 4*\n\n*Where is your project site located?*\n\n_Please type your answer_\n_(City, district or full address —\nExample: Kanchipuram · Hosur · Ambattur Chennai · Thiruvallur)_`);
+        await sendMessage(phone, `👤 Thank you, ${contact.name}!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 2 of 5*\n\n*What is the total area you need for your project?*\n\n_Please type your answer_\n_(Example: 5,000 sq ft · 10,000 sq ft · 1 acre · 2 grounds)_`);
         return;
     }
     
     if (contact.quote_step === 2) {
-        contact.site_location = messageText;
+        contact.area_required = messageText;
         contact.quote_step = 3;
         await contact.save();
-        await sendMessage(phone, `📍 Perfect!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 3 of 4*\n\n*When do you plan to start the project?*\n\n*1️⃣ ⚡ Immediately — within 1 month*\n*2️⃣ 📅 In 1 to 3 months*\n*3️⃣ 🗓️ In 3 to 6 months*\n*4️⃣ 💭 Just planning — no fixed date yet*\n\n_Reply with a number_`);
+        await sendMessage(phone, `✅ Noted!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 3 of 5*\n\n*Where is your project site located?*\n\n_Please type your answer_\n_(City, district or full address —\nExample: Kanchipuram · Hosur · Ambattur Chennai · Thiruvallur)_`);
         return;
     }
 
     if (contact.quote_step === 3) {
+        contact.site_location = messageText;
+        contact.quote_step = 4;
+        await contact.save();
+        await sendMessage(phone, `📍 Perfect!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 4 of 5*\n\n*When do you plan to start the project?*\n\n*1️⃣ ⚡ Immediately — within 1 month*\n*2️⃣ 📅 In 1 to 3 months*\n*3️⃣ 🗓️ In 3 to 6 months*\n*4️⃣ 💭 Just planning — no fixed date yet*\n\n_Reply with a number_`);
+        return;
+    }
+
+    if (contact.quote_step === 4) {
         if (msg === "1") contact.project_timeline = "Immediately";
         else if (msg === "2") contact.project_timeline = "1–3 months";
         else if (msg === "3") contact.project_timeline = "3–6 months";
         else if (msg === "4") contact.project_timeline = "Just planning";
         else contact.project_timeline = messageText;
 
-        contact.quote_step = 4;
+        contact.quote_step = 5;
         await contact.save();
-        await sendMessage(phone, `🗓️ Noted!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 4 of 4 — Optional*\n\n*What is your approximate project budget?*\n\n*1️⃣ Under ₹20 Lakhs*\n*2️⃣ ₹20 Lakhs – ₹50 Lakhs*\n*3️⃣ ₹50 Lakhs – ₹1 Crore*\n*4️⃣ Above ₹1 Crore*\n*5️⃣ Not sure yet*\n\n_Reply with a number_`);
+        await sendMessage(phone, `🗓️ Noted!\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 5 of 5 — Optional*\n\n*What is your approximate project budget?*\n\n*1️⃣ Under ₹20 Lakhs*\n*2️⃣ ₹20 Lakhs – ₹50 Lakhs*\n*3️⃣ ₹50 Lakhs – ₹1 Crore*\n*4️⃣ Above ₹1 Crore*\n*5️⃣ Not sure yet*\n\n_Reply with a number_`);
         return;
     }
 
-    if (contact.quote_step === 4) {
+    if (contact.quote_step === 5) {
         if (msg === "1") contact.budget_range = "Under ₹20 Lakhs";
         else if (msg === "2") contact.budget_range = "₹20–50 Lakhs";
         else if (msg === "3") contact.budget_range = "₹50L–₹1Cr";
@@ -376,11 +384,11 @@ async function handleBotReply(phone, messageText, contact) {
         contact.lead_score = calculateLeadScore(contact);
         await contact.save();
 
-        const summary = `🎉 *Thank you for your patience, Sir/Madam!*\n\nWe have received all your details.\nHere is a summary of your requirement:\n\n━━━━━━━━━━━━━━━━━\n🔧 *Service:* ${contact.selected_service || "PEB / Construction"}\n📐 *Area Required:* ${contact.area_required}\n📍 *Site Location:* ${contact.site_location}\n📅 *Timeline:* ${contact.project_timeline}\n💰 *Budget:* ${contact.budget_range}\n━━━━━━━━━━━━━━━━━\n\n✅ Your information has been updated to our project team.\n\n📞 You will receive a *personal call back within 2 hours* from our team.\n\n📄 A detailed *estimation quotation* will be prepared and shared with you based on your exact requirements.\n\nThank you for choosing *Deepika Builtech Engineering.* 🏗️\n\nWe look forward to building something great with you. Have a wonderful day! 🙏\n\n_📞 +91 96000 67611_\n_🌐 deepikabuiltech.com_`;
+        const summary = `🎉 *Thank you for your patience, Sir/Madam! (${contact.name})*\n\nWe have received all your details.\nHere is a summary of your requirement:\n\n━━━━━━━━━━━━━━━━━\n👤 *Name:* ${contact.name}\n🔧 *Service:* ${contact.selected_service || "PEB / Construction"}\n📐 *Area Required:* ${contact.area_required}\n📍 *Site Location:* ${contact.site_location}\n📅 *Timeline:* ${contact.project_timeline}\n💰 *Budget:* ${contact.budget_range}\n━━━━━━━━━━━━━━━━━\n\n✅ Your information has been updated to our project team.\n\n📞 You will receive a *personal call back within 2 hours* from our team.\n\n📄 A detailed *estimation quotation* will be prepared and shared with you based on your exact requirements.\n\nThank you for choosing *Deepika Builtech Engineering.* 🏗️\n\nWe look forward to building something great with you. Have a wonderful day! 🙏\n\n_📞 +91 96000 67611_\n_🌐 deepikabuiltech.com_`;
         await sendMessage(phone, summary);
 
         if (SALES_TEAM_PHONE) {
-            const alert = `🔔 *NEW LEAD — Deepika Builtech CRM*\n━━━━━━━━━━━━━━━━━━━━━\n👤 *Name:* ${contact.name}\n📱 *WhatsApp:* ${phone}\n🔧 *Service:* ${contact.selected_service || "PEB"}\n📐 *Area:* ${contact.area_required}\n📍 *Location:* ${contact.site_location}\n📅 *Timeline:* ${contact.project_timeline}\n💰 *Budget:* ${contact.budget_range}\n⏰ *Received:* ${new Date().toLocaleString()}\n━━━━━━━━━━━━━━━━━━━━━\n⚡ *ACTION: Call within 2 hours*\n\nLead Score: ${contact.lead_score}`;
+            const alert = `🔔 *NEW LEAD — Deepika Builtech CRM*\n━━━━━━━━━━━━━━━━━━━━━\n👤 *Name:* ${contact.name}\n📱 *Contact ID:* ${phone}\n🔧 *Service:* ${contact.selected_service || "PEB"}\n📐 *Area:* ${contact.area_required}\n📍 *Location:* ${contact.site_location}\n📅 *Timeline:* ${contact.project_timeline}\n💰 *Budget:* ${contact.budget_range}\n⏰ *Received:* ${new Date().toLocaleString()}\n━━━━━━━━━━━━━━━━━━━━━\n⚡ *ACTION: Call within 2 hours*\n\nLead Score: ${contact.lead_score}`;
             await sendMessage(SALES_TEAM_PHONE, alert);
         }
 
@@ -393,7 +401,7 @@ async function handleBotReply(phone, messageText, contact) {
         }
 
         // Push lead to Deepika CRM Supabase backend
-        axios.post(process.env.CRM_LEAD_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-lead', {
+        axios.post(process.env.CRM_LEAD_WEBHOOK || 'https://deepika-builtech-crm-4jj1.onrender.com/api/webhooks/whatsapp-bot-lead', {
             CustomerName: contact.name,
             WhatsAppNumber: phone,
             ServiceSelected: contact.selected_service,
