@@ -380,7 +380,27 @@ async function handleBotReply(phone, messageText, contact) {
     const isWelcome = msg.includes("hi") || msg.includes("hello") || msg.includes("hey") || msg.includes("start") || msg.includes("hai") || msg.includes("vanakkam") || contact.messageCount === 1;
 
     if (isWelcome) {
-        await sendInteractiveButtons(phone, `🏗️ *Welcome to Deepika Builtech Engineering!*\n\nTamil Nadu's most trusted Pre-Engineered Building specialists — based in Chennai.\n\n🏆 Excellence Award 2025\n✅ 10+ Years of Experience  \n✅ 150+ Projects Delivered  \n✅ 100+ Happy Clients  \n✅ 3 Manufacturing Units in Tamil Nadu\n\nPlease select an option:\n\n*1️⃣ About Us*\n*2️⃣ Our Services*\n*3️⃣ Get a Free Quote*\n*4️⃣ Contact & Locations*\n\n_Reply with a number or tap a button_ 😊`, [
+        const welcomeText = `🏗️ Welcome to Deepika Builtech Engineering!
+
+Tamil Nadu's most trusted Pre-Engineered Building specialists — based in Chennai.
+
+🏆 Excellence Award 2025
+✅ 10+ Years of Experience
+✅ 150+ Projects Delivered
+✅ 100+ Happy Clients
+✅ 3 Manufacturing Units in Tamil Nadu
+
+Please select an option:
+
+1️⃣ About Us
+2️⃣ Our Services
+3️⃣ Get a Free Quote
+4️⃣ Contact & Locations
+
+Reply with a number or tap a button
+😊`;
+
+        await sendInteractiveButtons(phone, welcomeText, [
             { id: "btn_about", title: "1 - About Us" },
             { id: "btn_services", title: "2 - Services" },
             { id: "btn_quote", title: "3 - Free Quote" }
