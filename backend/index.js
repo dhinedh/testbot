@@ -385,9 +385,9 @@ async function handleBotReply(phone, messageText, contact) {
 Tamil Nadu's most trusted Pre-Engineered Building specialists — based in Chennai.
 
 🏆 Excellence Award 2025
-✅ 10+ Years of Experience
-✅ 150+ Projects Delivered
-✅ 100+ Happy Clients
+✅ 15+ Years of Experience
+✅ 250+ Projects Delivered
+✅ 200+ Happy Clients
 ✅ 3 Manufacturing Units in Tamil Nadu
 
 Please select an option:
@@ -409,7 +409,7 @@ Reply with a number or tap a button
     }
 
     if (msg === "btn_about" || msg === "1" || msg.includes("about")) {
-        await sendInteractiveButtons(phone, `🏢 *About Deepika Builtech Engineering*\n\nWe are a leading Pre-Engineered Building (PEB) construction company headquartered in Ambattur, Chennai — with 10+ years of trusted service across Tamil Nadu.\n\n🏭 *What We Build:*\nWe design, fabricate and erect high-quality PEB structures, warehouses, cold storages, mezzanine floors, industrial sheds and godowns — completely under one roof.\n\n📍 *Our 3 Locations:*\n- Head Office — Ambattur, Chennai\n- Unit I — Kanchipuram District  \n- Unit II — Thirumullaivoyal, Thiruvallur\n\n🏆 *Why 100+ Clients Choose Us:*\n✅ In-house manufacturing — no middlemen\n✅ On-time delivery — every single project\n✅ Transparent pricing — zero hidden costs\n✅ CNC precision steel fabrication\n✅ End-to-end project management\n✅ Excellence Award 2025 winner\n\nWhat would you like to do next?\n\n*1️⃣ View Our Services*\n*2️⃣ Get a Free Quote*\n*3️⃣ Back to Main Menu*`, [
+        await sendInteractiveButtons(phone, `🏢 *About Deepika Builtech Engineering*\n\nWe are a leading Pre-Engineered Building (PEB) construction company headquartered in Ambattur, Chennai — with 15+ years of trusted service across Tamil Nadu.\n\n🏭 *What We Build:*\nWe design, fabricate and erect high-quality PEB structures, warehouses, cold storages, mezzanine floors, industrial sheds and godowns — completely under one roof.\n\n📍 *Our 3 Locations:*\n- Head Office — Ambattur, Chennai\n- Unit I — Kanchipuram District  \n- Unit II — Thirumullaivoyal, Thiruvallur\n\n🏆 *Why 200+ Clients Choose Us:*\n✅ In-house manufacturing — no middlemen\n✅ On-time delivery — every single project\n✅ Transparent pricing — zero hidden costs\n✅ CNC precision steel fabrication\n✅ End-to-end project management\n✅ Excellence Award 2025 winner\n\nWhat would you like to do next?\n\n*1️⃣ View Our Services*\n*2️⃣ Get a Free Quote*\n*3️⃣ Back to Main Menu*`, [
             { id: "btn_services", title: "View Services" },
             { id: "btn_quote", title: "Get Free Quote" },
             { id: "btn_menu", title: "Main Menu" }
