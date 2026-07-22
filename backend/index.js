@@ -12,6 +12,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const INSTAGRAM_ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || ACCESS_TOKEN;
 const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/whatsapp-crm';
 const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
@@ -47,8 +48,8 @@ const Contact = mongoose.model('Contact', contactSchema);
 
 // --- Meta Send API Helpers for Facebook Messenger & Instagram DM ---
 async function sendMetaMessage(to, text) {
-    if (!ACCESS_TOKEN) {
-        console.warn('⚠️ Missing Meta Access Token');
+    if (!INSTAGRAM_ACCESS_TOKEN) {
+        console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
     }
     const rawId = to.replace(/^(fb:|ig:)/, '');
@@ -56,7 +57,7 @@ async function sendMetaMessage(to, text) {
         await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/me/messages`,
-            params: { access_token: ACCESS_TOKEN },
+            params: { access_token: INSTAGRAM_ACCESS_TOKEN },
             headers: { 'Content-Type': 'application/json' },
             data: {
                 recipient: { id: rawId },
@@ -69,8 +70,8 @@ async function sendMetaMessage(to, text) {
 }
 
 async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
-    if (!ACCESS_TOKEN) {
-        console.warn('⚠️ Missing Meta Access Token');
+    if (!INSTAGRAM_ACCESS_TOKEN) {
+        console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
     }
     const rawId = to.replace(/^(fb:|ig:)/, '');
@@ -84,7 +85,7 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
         await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/me/messages`,
-            params: { access_token: ACCESS_TOKEN },
+            params: { access_token: INSTAGRAM_ACCESS_TOKEN },
             headers: { 'Content-Type': 'application/json' },
             data: {
                 recipient: { id: rawId },
@@ -100,13 +101,13 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
 }
 
 async function getMetaUserProfile(senderId, platform) {
-    if (!ACCESS_TOKEN) return null;
+    if (!INSTAGRAM_ACCESS_TOKEN) return null;
     try {
         if (platform === 'facebook') {
             const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
                 params: {
                     fields: 'first_name,last_name',
-                    access_token: ACCESS_TOKEN
+                    access_token: INSTAGRAM_ACCESS_TOKEN
                 }
             });
             if (res.data && (res.data.first_name || res.data.last_name)) {
@@ -116,7 +117,7 @@ async function getMetaUserProfile(senderId, platform) {
             const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
                 params: {
                     fields: 'username,name',
-                    access_token: ACCESS_TOKEN
+                    access_token: INSTAGRAM_ACCESS_TOKEN
                 }
             });
             if (res.data) {
@@ -522,6 +523,7 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
     res.sendStatus(200);
     const body = req.body;
+    console.log(`📩 [Webhook Event Received] Object: ${body && body.object}`);
 
     // 1. WhatsApp Webhook Entry
     if (body.object === 'whatsapp_business_account' && body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0]) {
