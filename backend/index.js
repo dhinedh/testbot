@@ -45,8 +45,97 @@ const contactSchema = new mongoose.Schema({
 
 const Contact = mongoose.model('Contact', contactSchema);
 
+// --- Meta Send API Helpers for Facebook Messenger & Instagram DM ---
+async function sendMetaMessage(to, text) {
+    if (!ACCESS_TOKEN) {
+        console.warn('⚠️ Missing Meta Access Token');
+        return;
+    }
+    const rawId = to.replace(/^(fb:|ig:)/, '');
+    try {
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/me/messages`,
+            params: { access_token: ACCESS_TOKEN },
+            headers: { 'Content-Type': 'application/json' },
+            data: {
+                recipient: { id: rawId },
+                message: { text: text }
+            }
+        });
+    } catch (error) {
+        console.error(`Error sending Meta message to ${to}:`, error.response ? error.response.data : error.message);
+    }
+}
+
+async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
+    if (!ACCESS_TOKEN) {
+        console.warn('⚠️ Missing Meta Access Token');
+        return;
+    }
+    const rawId = to.replace(/^(fb:|ig:)/, '');
+    const quick_replies = buttonsArray.map((btn) => ({
+        content_type: "text",
+        title: btn.title.substring(0, 20),
+        payload: btn.id
+    }));
+
+    try {
+        await axios({
+            method: 'POST',
+            url: `https://graph.facebook.com/v20.0/me/messages`,
+            params: { access_token: ACCESS_TOKEN },
+            headers: { 'Content-Type': 'application/json' },
+            data: {
+                recipient: { id: rawId },
+                message: {
+                    text: bodyText,
+                    quick_replies: quick_replies
+                }
+            }
+        });
+    } catch (error) {
+        console.error(`Error sending Meta quick replies to ${to}:`, error.response ? error.response.data : error.message);
+    }
+}
+
+async function getMetaUserProfile(senderId, platform) {
+    if (!ACCESS_TOKEN) return null;
+    try {
+        if (platform === 'facebook') {
+            const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+                params: {
+                    fields: 'first_name,last_name',
+                    access_token: ACCESS_TOKEN
+                }
+            });
+            if (res.data && (res.data.first_name || res.data.last_name)) {
+                return `${res.data.first_name || ''} ${res.data.last_name || ''}`.trim();
+            }
+        } else if (platform === 'instagram') {
+            const res = await axios.get(`https://graph.facebook.com/v20.0/${senderId}`, {
+                params: {
+                    fields: 'username,name',
+                    access_token: ACCESS_TOKEN
+                }
+            });
+            if (res.data) {
+                return res.data.name || res.data.username || null;
+            }
+        }
+    } catch (err) {
+        console.warn(`[Meta Profile Fetch Failed] senderId: ${senderId}, platform: ${platform}, error: ${err.message}`);
+    }
+    return null;
+}
+
 // --- Send Message Functions ---
 async function sendMessage(to, text) {
+    if (to.startsWith('fb:') || to.startsWith('ig:')) {
+        await sendMetaMessage(to, text);
+        return;
+    }
+
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     try {
         await axios({
@@ -61,6 +150,11 @@ async function sendMessage(to, text) {
 }
 
 async function sendInteractiveButtons(to, bodyText, buttonsArray) {
+    if (to.startsWith('fb:') || to.startsWith('ig:')) {
+        await sendMetaQuickReplies(to, bodyText, buttonsArray);
+        return;
+    }
+
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
@@ -85,6 +179,21 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray) {
 }
 
 async function sendInteractiveList(to, bodyText, buttonText, sections) {
+    if (to.startsWith('fb:') || to.startsWith('ig:')) {
+        // Flatten all section rows to map list rows to quick reply buttons
+        const buttonsArray = [];
+        sections.forEach((sec) => {
+            if (sec.rows) {
+                sec.rows.forEach((row) => {
+                    buttonsArray.push({ id: row.id, title: row.title });
+                });
+            }
+        });
+        // Limit to Meta's limit of 13 quick replies
+        await sendMetaQuickReplies(to, bodyText, buttonsArray.slice(0, 13));
+        return;
+    }
+
     if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
     try {
         await axios({
@@ -413,6 +522,8 @@ app.get('/webhook', (req, res) => {
 app.post('/webhook', async (req, res) => {
     res.sendStatus(200);
     const body = req.body;
+
+    // 1. WhatsApp Webhook Entry
     if (body.object === 'whatsapp_business_account' && body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages && body.entry[0].changes[0].value.messages[0]) {
         const webhook_event = body.entry[0].changes[0].value;
         const message = webhook_event.messages[0];
@@ -453,6 +564,58 @@ app.post('/webhook', async (req, res) => {
                 await handleBotReply(phone, messageText, contact);
             } catch(e) {
                 console.error("DB Error processing webhook:", e);
+            }
+        }
+    }
+
+    // 2. Facebook Messenger / Instagram DM Webhook Entry
+    if ((body.object === 'page' || body.object === 'instagram') && body.entry && body.entry[0].messaging && body.entry[0].messaging[0] && body.entry[0].messaging[0].message) {
+        const messaging = body.entry[0].messaging[0];
+        const senderId = messaging.sender?.id;
+        const platform = body.object === 'page' ? 'facebook' : 'instagram';
+        const unifiedPhoneId = platform === 'facebook' ? `fb:${senderId}` : `ig:${senderId}`;
+
+        let messageText = '';
+        if (messaging.message.quick_reply) {
+            messageText = messaging.message.quick_reply.payload;
+        } else if (messaging.message.text) {
+            messageText = messaging.message.text;
+        }
+
+        if (messageText && senderId) {
+            try {
+                let contact = await Contact.findOne({ phone: unifiedPhoneId });
+                const now = new Date();
+                if (!contact) {
+                    const profileName = await getMetaUserProfile(senderId, platform);
+                    const displayName = profileName || (platform === 'facebook' ? 'Facebook Customer' : 'Instagram Customer');
+                    contact = new Contact({ 
+                        phone: unifiedPhoneId, 
+                        name: displayName, 
+                        firstSeen: now, 
+                        lastSeen: now, 
+                        messageCount: 1, 
+                        messages: [{ text: messageText, time: now }] 
+                    });
+                } else {
+                    contact.lastSeen = now;
+                    contact.messageCount += 1;
+                    contact.messages.push({ text: messageText, time: now });
+                }
+                await contact.save();
+
+                // Sync enquiry immediately with Deepika CRM
+                axios.post(process.env.CRM_ENQUIRY_WEBHOOK || 'http://localhost:5000/api/webhooks/whatsapp-bot-enquiry', {
+                    CustomerName: contact.name,
+                    WhatsAppNumber: unifiedPhoneId,
+                    MessageText: messaging.message.quick_reply ? `Selection: ${messageText}` : messageText
+                })
+                .then(() => console.log(`[CRM Enquiry Sync] Message synced to CRM for ${unifiedPhoneId}`))
+                .catch(e => console.error("[CRM Enquiry Sync Error]:", e.message));
+
+                await handleBotReply(unifiedPhoneId, messageText, contact);
+            } catch (e) {
+                console.error("DB Error processing Meta webhook:", e);
             }
         }
     }
