@@ -18,8 +18,12 @@ const SALES_TEAM_PHONE = process.env.SALES_TEAM_PHONE || '';
 const GOOGLE_SHEETS_WEBHOOK = process.env.GOOGLE_SHEETS_WEBHOOK || '';
 
 function getMetaToken() {
-    const raw = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || process.env.ACCESS_TOKEN || '';
-    return raw.trim().replace(/^["']|["']$/g, '');
+    const igToken = process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN;
+    if (igToken) {
+        return igToken.trim().replace(/^["']|["']$/g, '');
+    }
+    const fallback = process.env.ACCESS_TOKEN || '';
+    return fallback.trim().replace(/^["']|["']$/g, '');
 }
 
 // --- MongoDB Setup ---
@@ -53,32 +57,45 @@ const Contact = mongoose.model('Contact', contactSchema);
 // --- Meta Send API Helpers for Facebook Messenger & Instagram DM ---
 async function sendMetaMessage(to, text) {
     const token = getMetaToken();
+    const hasIgToken = !!(process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN);
+    if (!hasIgToken) {
+        console.warn('⚠️ [Meta Token Warning] INSTAGRAM_ACCESS_TOKEN environment variable is NOT set on server! Falling back to ACCESS_TOKEN.');
+    }
     if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
     }
     const rawId = to.replace(/^(fb:|ig:)/, '');
+    const data = {
+        recipient: { id: rawId },
+        message: { text: text }
+    };
+
     try {
-        await axios({
-            method: 'POST',
-            url: `https://graph.facebook.com/v20.0/me/messages`,
-            headers: { 
-                'Authorization': `Bearer ${token}`, 
-                'Content-Type': 'application/json' 
-            },
-            data: {
-                recipient: { id: rawId },
-                message: { text: text }
-            }
+        await axios.post(`https://graph.facebook.com/v20.0/me/messages`, data, {
+            params: { access_token: token },
+            headers: { 'Content-Type': 'application/json' }
         });
         console.log(`✅ [Meta DM Sent] Successfully sent message to ${to}`);
     } catch (error) {
-        console.error(`Error sending Meta message to ${to}:`, error.response ? error.response.data : error.message);
+        try {
+            await axios.post(`https://graph.instagram.com/v20.0/me/messages`, data, {
+                params: { access_token: token },
+                headers: { 'Content-Type': 'application/json' }
+            });
+            console.log(`✅ [Meta DM Sent via IG API] Successfully sent message to ${to}`);
+        } catch (err2) {
+            console.error(`Error sending Meta message to ${to}:`, error.response ? error.response.data : error.message);
+        }
     }
 }
 
 async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
     const token = getMetaToken();
+    const hasIgToken = !!(process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN);
+    if (!hasIgToken) {
+        console.warn('⚠️ [Meta Token Warning] INSTAGRAM_ACCESS_TOKEN environment variable is NOT set on server! Falling back to ACCESS_TOKEN.');
+    }
     if (!token) {
         console.warn('⚠️ Missing Instagram / Meta Access Token');
         return;
@@ -89,26 +106,30 @@ async function sendMetaQuickReplies(to, bodyText, buttonsArray) {
         title: btn.title.substring(0, 20),
         payload: btn.id
     }));
+    const data = {
+        recipient: { id: rawId },
+        message: {
+            text: bodyText,
+            quick_replies: quick_replies
+        }
+    };
 
     try {
-        await axios({
-            method: 'POST',
-            url: `https://graph.facebook.com/v20.0/me/messages`,
-            headers: { 
-                'Authorization': `Bearer ${token}`, 
-                'Content-Type': 'application/json' 
-            },
-            data: {
-                recipient: { id: rawId },
-                message: {
-                    text: bodyText,
-                    quick_replies: quick_replies
-                }
-            }
+        await axios.post(`https://graph.facebook.com/v20.0/me/messages`, data, {
+            params: { access_token: token },
+            headers: { 'Content-Type': 'application/json' }
         });
         console.log(`✅ [Meta QuickReplies Sent] Successfully sent buttons to ${to}`);
     } catch (error) {
-        console.error(`Error sending Meta quick replies to ${to}:`, error.response ? error.response.data : error.message);
+        try {
+            await axios.post(`https://graph.instagram.com/v20.0/me/messages`, data, {
+                params: { access_token: token },
+                headers: { 'Content-Type': 'application/json' }
+            });
+            console.log(`✅ [Meta QuickReplies Sent via IG API] Successfully sent buttons to ${to}`);
+        } catch (err2) {
+            console.error(`Error sending Meta quick replies to ${to}:`, error.response ? error.response.data : error.message);
+        }
     }
 }
 
