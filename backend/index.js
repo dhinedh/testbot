@@ -6,8 +6,32 @@ const cors = require('cors');
 const cron = require('node-cron');
 
 const app = express();
-app.use(cors({ origin: 'https://testbot-gray-rho.vercel.app' }));
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+
+// --- Health & Root Endpoints ---
+app.get('/', (req, res) => {
+    res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>WhatsApp Bot & CRM Backend</title></head>
+        <body style="font-family: sans-serif; text-align: center; padding: 50px; background: #0f172a; color: #f8fafc;">
+            <h1 style="color: #22c55e;">✅ WhatsApp Bot & CRM Server is Live!</h1>
+            <p>Server Status: <strong>Operational</strong></p>
+            <p>Webhook URL: <code>https://whatapp-automation-kxml.onrender.com/webhook</code></p>
+            <p>CRM API Endpoint: <code>/crm</code></p>
+        </body>
+        </html>
+    `);
+});
+
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' });
+});
 
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
@@ -229,16 +253,20 @@ async function sendMessage(to, text) {
         return;
     }
 
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        console.error(`❌ [WhatsApp Send Error] Missing credentials! PHONE_NUMBER_ID: ${Boolean(PHONE_NUMBER_ID)}, ACCESS_TOKEN: ${Boolean(ACCESS_TOKEN)}`);
+        return;
+    }
     try {
-        await axios({
+        const response = await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
             data: { messaging_product: 'whatsapp', to: to, type: 'text', text: { body: text } }
         });
+        console.log(`✅ [WhatsApp Sent] Message sent to ${to}, ID: ${response.data?.messages?.[0]?.id}`);
     } catch (error) {
-        console.error("Error sending message:", error.response ? error.response.data : error.message);
+        console.error("❌ [WhatsApp Send Error]:", error.response ? JSON.stringify(error.response.data) : error.message);
     }
 }
 
@@ -248,14 +276,17 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray) {
         return;
     }
 
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        console.error(`❌ [WhatsApp Buttons Error] Missing credentials! PHONE_NUMBER_ID: ${Boolean(PHONE_NUMBER_ID)}, ACCESS_TOKEN: ${Boolean(ACCESS_TOKEN)}`);
+        return;
+    }
     const buttons = buttonsArray.map((btn) => ({
         type: "reply",
         reply: { id: btn.id, title: btn.title.substring(0, 20) }
     }));
 
     try {
-        await axios({
+        const response = await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
@@ -266,8 +297,9 @@ async function sendInteractiveButtons(to, bodyText, buttonsArray) {
                 interactive: { type: 'button', body: { text: bodyText }, action: { buttons } }
             }
         });
+        console.log(`✅ [WhatsApp Buttons Sent] Sent to ${to}, ID: ${response.data?.messages?.[0]?.id}`);
     } catch (error) {
-        console.error("Error sending buttons:", error.response ? error.response.data : error.message);
+        console.error("❌ [WhatsApp Buttons Error]:", error.response ? JSON.stringify(error.response.data) : error.message);
     }
 }
 
@@ -287,9 +319,12 @@ async function sendInteractiveList(to, bodyText, buttonText, sections) {
         return;
     }
 
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
+    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+        console.error(`❌ [WhatsApp List Error] Missing credentials! PHONE_NUMBER_ID: ${Boolean(PHONE_NUMBER_ID)}, ACCESS_TOKEN: ${Boolean(ACCESS_TOKEN)}`);
+        return;
+    }
     try {
-        await axios({
+        const response = await axios({
             method: 'POST',
             url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
             headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
@@ -307,8 +342,9 @@ async function sendInteractiveList(to, bodyText, buttonText, sections) {
                 }
             }
         });
+        console.log(`✅ [WhatsApp List Sent] Sent to ${to}, ID: ${response.data?.messages?.[0]?.id}`);
     } catch (error) {
-        console.error("Error sending list:", error.response ? error.response.data : error.message);
+        console.error("❌ [WhatsApp List Error]:", error.response ? JSON.stringify(error.response.data) : error.message);
     }
 }
 
