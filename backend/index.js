@@ -72,9 +72,7 @@ const contactSchema = new mongoose.Schema({
     quote_step: { type: Number, default: 0 },
     lead_status: { type: String, default: "New" },
     lead_score: { type: Number, default: 0 },
-    is_paused: { type: Boolean, default: false },
-    current_menu: { type: String, default: "main" },
-    cart: [{ name: String, qty: { type: Number, default: 1 }, price: Number }]
+    is_paused: { type: Boolean, default: false }
 });
 
 const Contact = mongoose.model('Contact', contactSchema);
@@ -533,324 +531,109 @@ async function handleBotReply(phone, messageText, contact) {
         return;
     }
 
-    // --- MAIN MENUS & NAVIGATION ---
+    // --- MAIN MENUS ---
     const isWelcome = msg.includes("hi") || msg.includes("hello") || msg.includes("hey") || msg.includes("start") || msg.includes("hai") || msg.includes("vanakkam") || contact.messageCount === 1;
 
-    // Helper to send Main Menu
-    const sendMainMenu = async () => {
-        contact.current_menu = "main";
-        await contact.save();
-        const welcomeText = `👋 Welcome to Mansara Foods!\n\nWe're happy to serve you.\n\nPlease choose an option below:\n\n1️⃣ Shop Products\n2️⃣ Orders\n3️⃣ Business (Dealers & Bulk Orders)\n4️⃣ Help & Support`;
+    if (isWelcome) {
+        const welcomeText = `👋 Welcome to Mansara Foods!
+
+We're happy to serve you.
+
+Please choose an option below:
+
+1️⃣ Shop Products
+2️⃣ Orders
+3️⃣ Business (Dealers & Bulk Orders)
+4️⃣ Help & Support`;
+
         const imageUrl = process.env.WELCOME_IMAGE_URL || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800';
+
         await sendImageWithButtons(phone, imageUrl, welcomeText, [
             { id: "btn_shop", title: "1 - Shop Products" },
             { id: "btn_orders", title: "2 - Orders" },
             { id: "btn_business", title: "3 - Business" }
         ]);
-    };
-
-    if (isWelcome || msg === "main menu") {
-        await sendMainMenu();
         return;
     }
 
-    const curr = contact.current_menu || "main";
-
-    // ----------------------------------------------------
-    // MAIN MENU HANDLING
-    // ----------------------------------------------------
-    if (curr === "main") {
-        if (msg === "1" || msg === "btn_shop" || msg.includes("shop") || msg.includes("product")) {
-            contact.current_menu = "shop";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🛒 *Shop Products*\n\n1️⃣ View Product Categories\n2️⃣ Today's Offers\n3️⃣ New Arrivals\n4️⃣ Recipes\n5️⃣ Back to Main Menu`, [
-                { id: "btn_categories", title: "1 - Categories" },
-                { id: "btn_offers", title: "2 - Today Offers" },
-                { id: "btn_menu", title: "5 - Main Menu" }
-            ]);
-            return;
-        }
-
-        if (msg === "2" || msg === "btn_orders" || msg.includes("order")) {
-            contact.current_menu = "orders";
-            await contact.save();
-            await sendInteractiveButtons(phone, `📦 *Orders*\n\n1️⃣ Place New Order\n2️⃣ Track My Order\n3️⃣ Reorder Previous Purchase\n4️⃣ Order History\n5️⃣ Payment Status\n6️⃣ Back`, [
-                { id: "btn_track_order", title: "2 - Track Order" },
-                { id: "btn_order_history", title: "4 - Order History" },
-                { id: "btn_menu", title: "6 - Back" }
-            ]);
-            return;
-        }
-
-        if (msg === "3" || msg === "btn_business" || msg.includes("business") || msg.includes("dealer") || msg.includes("bulk")) {
-            contact.current_menu = "business";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🏪 *Business*\n\n1️⃣ Dealer Registration\n2️⃣ Distributor Registration\n3️⃣ Bulk Order\n4️⃣ Request Price List\n5️⃣ Become a Partner\n6️⃣ Contact Sales Team\n7️⃣ Back`, [
-                { id: "btn_dealer", title: "1 - Dealer Reg" },
-                { id: "btn_bulk", title: "3 - Bulk Order" },
-                { id: "btn_menu", title: "7 - Back" }
-            ]);
-            return;
-        }
-
-        if (msg === "4" || msg === "btn_support" || msg.includes("help") || msg.includes("support")) {
-            contact.current_menu = "support";
-            await contact.save();
-            await sendInteractiveButtons(phone, `💬 *Help & Support*\n\n1️⃣ FAQs\n2️⃣ Store Locator\n3️⃣ Customer Support\n4️⃣ Raise a Complaint\n5️⃣ Feedback\n6️⃣ Contact Us\n7️⃣ Back`, [
-                { id: "btn_faqs", title: "1 - FAQs" },
-                { id: "btn_agent", title: "3 - Support Agent" },
-                { id: "btn_menu", title: "7 - Back" }
-            ]);
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // SHOP PRODUCTS SUB-MENU (curr === "shop")
-    // ----------------------------------------------------
-    if (curr === "shop") {
-        if (msg === "1" || msg === "btn_categories" || msg.includes("category") || msg.includes("categories")) {
-            contact.current_menu = "categories";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🥫 *Product Categories*\n\n1️⃣ Pickles\n2️⃣ Masala Powders\n3️⃣ Ready Mix\n4️⃣ Snacks\n5️⃣ Oils & Ghee\n6️⃣ View All Products\n7️⃣ Back`, [
-                { id: "btn_pickles", title: "1 - Pickles" },
-                { id: "btn_masala", title: "2 - Masalas" },
-                { id: "btn_shop", title: "7 - Back" }
-            ]);
-            return;
-        }
-
-        if (msg === "2" || msg === "btn_offers" || msg.includes("offer")) {
-            await sendMessage(phone, `🎉 *Today's Special Offers!*\n\n🔥 Buy 2 Pickles, Get 1 Free!\n🔥 15% OFF on Pure Ghee (1L)\n🔥 Free Delivery on orders above ₹499\n\nReply *1* to Add Offer to Cart, or *5* for Shop Products.`);
-            return;
-        }
-
-        if (msg === "3" || msg.includes("arrival")) {
-            await sendMessage(phone, `✨ *New Arrivals at Mansara Foods!*\n\n🌱 Organic Cold-Pressed Coconut Oil (500ml) — ₹240\n🌶️ Homemade Garlic Pickle (250g) — ₹120\n🌾 Multi-Grain Dosa Ready Mix (500g) — ₹90`);
-            return;
-        }
-
-        if (msg === "4" || msg.includes("recipe")) {
-            await sendMessage(phone, `📖 *Mansara Kitchen Recipes*\n\n1️⃣ Traditional Sambhar Secret\n2️⃣ Quick Lemon Rice with Pickle\n3️⃣ Instant Crispy Murukku Recipe\n\nVisit our website or reply with a recipe number!`);
-            return;
-        }
-
-        if (msg === "5" || msg === "7" || msg === "btn_menu" || msg.includes("back") || msg.includes("main")) {
-            await sendMainMenu();
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // PRODUCT CATEGORIES SUB-MENU (curr === "categories")
-    // ----------------------------------------------------
-    if (curr === "categories") {
-        if (msg === "1" || msg === "btn_pickles" || msg.includes("pickle") || msg.includes("lemon")) {
-            contact.current_menu = "product_lemon";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🍋 *Lemon Pickle*\n\n✅ Net Weight: 500g\n✅ Price: ₹180\n\n1️⃣ View Details\n2️⃣ Add to Cart\n3️⃣ Buy Now\n4️⃣ Back`, [
-                { id: "btn_add_cart", title: "2 - Add to Cart" },
-                { id: "btn_buy_now", title: "3 - Buy Now" },
-                { id: "btn_categories", title: "4 - Back" }
-            ]);
-            return;
-        }
-
-        if (msg === "2" || msg === "btn_masala" || msg.includes("masala")) {
-            await sendMessage(phone, `🌶️ *Masala Powders*\n\n1. Sambar Powder (200g) — ₹95\n2. Rasam Powder (200g) — ₹85\n3. Garam Masala (100g) — ₹75\n\nReply with item name to purchase or *7* to go back.`);
-            return;
-        }
-
-        if (msg === "3" || msg.includes("ready mix")) {
-            await sendMessage(phone, `🍲 *Ready Mixes*\n\n1. Gulab Jamun Mix (200g) — ₹65\n2. Rava Dosa Mix (500g) — ₹80\n3. Idli Batter Mix (1kg) — ₹70`);
-            return;
-        }
-
-        if (msg === "4" || msg.includes("snack")) {
-            await sendMessage(phone, `🍿 *Snacks*\n\n1. Special Mixture (250g) — ₹90\n2. Butter Murukku (200g) — ₹85\n3. Ribbon Pakoda (200g) — ₹80`);
-            return;
-        }
-
-        if (msg === "5" || msg.includes("oil") || msg.includes("ghee")) {
-            await sendMessage(phone, `🍯 *Oils & Ghee*\n\n1. Pure Cow Ghee (500ml) — ₹390\n2. Cold-Pressed Sesame Oil (1L) — ₹340\n3. Groundnut Oil (1L) — ₹220`);
-            return;
-        }
-
-        if (msg === "6" || msg.includes("all")) {
-            await sendMessage(phone, `🛍️ *Mansara Foods Catalog*\n\nBrowse 50+ fresh authentic food products on our official store website:\n🌐 https://mansarafoods.com/catalog`);
-            return;
-        }
-
-        if (msg === "7" || msg === "btn_shop" || msg.includes("back")) {
-            contact.current_menu = "shop";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🛒 *Shop Products*\n\n1️⃣ View Product Categories\n2️⃣ Today's Offers\n3️⃣ New Arrivals\n4️⃣ Recipes\n5️⃣ Back to Main Menu`, [
-                { id: "btn_categories", title: "1 - Categories" },
-                { id: "btn_offers", title: "2 - Today Offers" },
-                { id: "btn_menu", title: "5 - Main Menu" }
-            ]);
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // PRODUCT VIEW SUB-MENU (curr === "product_lemon")
-    // ----------------------------------------------------
-    if (curr === "product_lemon") {
-        if (msg === "1" || msg.includes("detail")) {
-            await sendMessage(phone, `🍋 *Lemon Pickle — Product Details*\n\n- Net Weight: 500g\n- Ingredients: Fresh Organic Lemons, Gingelly Oil, Red Chilli Powder, Mustard, Fenugreek, Asafoetida, Salt.\n- Shelf Life: 12 Months\n- 100% Homemade Taste & No Preservatives.`);
-            return;
-        }
-
-        if (msg === "2" || msg === "btn_add_cart" || msg.includes("cart")) {
-            contact.cart.push({ name: "Lemon Pickle 500g", qty: 1, price: 180 });
-            await contact.save();
-            await sendMessage(phone, `🛒 *Lemon Pickle (500g)* added to your cart! ✅\nTotal Cart Value: ₹180\n\nReply *3* to Buy Now or *4* to continue shopping.`);
-            return;
-        }
-
-        if (msg === "3" || msg === "btn_buy_now" || msg.includes("buy")) {
-            await sendMessage(phone, `🛍️ *Order Confirmation*\n\nProduct: Lemon Pickle 500g\nAmount: ₹180 (Free Delivery)\n\nPlease reply with your *Full Address & Pincode* to confirm Cash on Delivery (COD) / UPI payment!`);
-            return;
-        }
-
-        if (msg === "4" || msg === "btn_categories" || msg.includes("back")) {
-            contact.current_menu = "categories";
-            await contact.save();
-            await sendInteractiveButtons(phone, `🥫 *Product Categories*\n\n1️⃣ Pickles\n2️⃣ Masala Powders\n3️⃣ Ready Mix\n4️⃣ Snacks\n5️⃣ Oils & Ghee\n6️⃣ View All Products\n7️⃣ Back`, [
-                { id: "btn_pickles", title: "1 - Pickles" },
-                { id: "btn_masala", title: "2 - Masalas" },
-                { id: "btn_shop", title: "7 - Back" }
-            ]);
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // ORDERS SUB-MENU (curr === "orders")
-    // ----------------------------------------------------
-    if (curr === "orders") {
-        if (msg === "1" || msg.includes("place") || msg.includes("new")) {
-            await sendMessage(phone, `🛍️ Please select items from *Shop Products* (Option 1) to place your new order!`);
-            return;
-        }
-
-        if (msg === "2" || msg === "btn_track_order" || msg.includes("track")) {
-            await sendMessage(phone, `📦 *Track Order*\n\nPlease reply with your *Order ID* (e.g. #MF1042) to get real-time tracking update!`);
-            return;
-        }
-
-        if (msg === "3" || msg.includes("reorder")) {
-            await sendMessage(phone, `🔄 *Reorder Previous Purchase*\n\nReordering your last order: *Lemon Pickle 500g (₹180)*.\nReply *YES* to confirm reorder.`);
-            return;
-        }
-
-        if (msg === "4" || msg === "btn_order_history" || msg.includes("history")) {
-            await sendMessage(phone, `📜 *Order History*\n\nOrder #MF1042 — Lemon Pickle 500g (Delivered)\nOrder #MF0988 — Pure Cow Ghee 1L (Delivered)`);
-            return;
-        }
-
-        if (msg === "5" || msg.includes("payment")) {
-            await sendMessage(phone, `💳 *Payment Status*\n\nYour last payment status: *SUCCESSFUL (UPI)* ✅`);
-            return;
-        }
-
-        if (msg === "6" || msg === "btn_menu" || msg.includes("back")) {
-            await sendMainMenu();
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // BUSINESS SUB-MENU (curr === "business")
-    // ----------------------------------------------------
-    if (curr === "business") {
-        if (msg === "1" || msg === "btn_dealer" || msg.includes("dealer")) {
-            await sendMessage(phone, `🤝 *Dealer Registration*\n\nThank you for your interest! Please reply with:\n1. Business / Shop Name\n2. City & Pincode\n3. GST Number (Optional)\n\nOur business team will contact you within 2 hours!`);
-            return;
-        }
-
-        if (msg === "2" || msg.includes("distributor")) {
-            await sendMessage(phone, `🏭 *Distributor Registration*\n\nPlease share your target district / territory in Tamil Nadu and godown capacity to receive our distributorship terms.`);
-            return;
-        }
-
-        if (msg === "3" || msg === "btn_bulk" || msg.includes("bulk")) {
-            await sendMessage(phone, `📦 *Bulk Order*\n\nWe offer tier-1 bulk pricing for quantities over 25kg / 50 units. Reply with required items and quantity!`);
-            return;
-        }
-
-        if (msg === "4" || msg.includes("price") || msg.includes("rate")) {
-            await sendMessage(phone, `📄 *Wholesale Price List*\n\nDownload our latest 2026 B2B Wholesale Rate Card here:\n🌐 https://mansarafoods.com/wholesale-pricelist.pdf`);
-            return;
-        }
-
-        if (msg === "5" || msg.includes("partner")) {
-            await sendMessage(phone, `✨ *Become a Partner*\n\nWe welcome modern trade partners, supermarket chains, and online resellers. Contact partner desk at partner@mansarafoods.com`);
-            return;
-        }
-
-        if (msg === "6" || msg.includes("sales") || msg.includes("team")) {
-            await sendMessage(phone, `📞 *Contact Sales Team*\n\nDirect Business Desk: +91 96000 67611\nEmail: sales@mansarafoods.com`);
-            return;
-        }
-
-        if (msg === "7" || msg === "btn_menu" || msg.includes("back")) {
-            await sendMainMenu();
-            return;
-        }
-    }
-
-    // ----------------------------------------------------
-    // HELP & SUPPORT SUB-MENU (curr === "support")
-    // ----------------------------------------------------
-    if (curr === "support") {
-        if (msg === "1" || msg === "btn_faqs" || msg.includes("faq")) {
-            await sendMessage(phone, `❓ *Frequently Asked Questions (FAQs)*\n\nQ: What is the delivery time?\nA: 24-48 hours across Tamil Nadu, 3-5 days across India.\n\nQ: Are products 100% natural?\nA: Yes, no artificial preservatives or colors used.`);
-            return;
-        }
-
-        if (msg === "2" || msg.includes("store") || msg.includes("locator")) {
-            await sendMessage(phone, `📍 *Store Locator*\n\nMansara Foods Flagship Store: SIDCO Estate, Ambattur, Chennai — 600098.\nAvailable at 150+ supermarket outlets in Chennai & Kanchipuram.`);
-            return;
-        }
-
-        if (msg === "3" || msg === "btn_agent" || msg.includes("agent") || msg.includes("human")) {
-            contact.is_paused = true;
-            await contact.save();
-            await sendMessage(phone, `👤 Connecting you to Customer Support...\n\nAn agent will join this chat shortly. You can also call us directly at +91 96000 67611.`);
-            return;
-        }
-
-        if (msg === "4" || msg.includes("complaint")) {
-            await sendMessage(phone, `⚠️ *Raise a Complaint*\n\nWe sincerely apologize for any inconvenience. Please type your complaint description & Order ID, and our manager will contact you immediately.`);
-            return;
-        }
-
-        if (msg === "5" || msg.includes("feedback")) {
-            await sendMessage(phone, `⭐ *Customer Feedback*\n\nHow was your experience with Mansara Foods? Rate us 1 to 5 stars!`);
-            return;
-        }
-
-        if (msg === "6" || msg.includes("contact")) {
-            await sendMessage(phone, `📞 *Contact Us*\n\nPhone: +91 96000 67611\nEmail: support@mansarafoods.com\nAddress: Ambattur Industrial Estate, Chennai`);
-            return;
-        }
-
-        if (msg === "7" || msg === "btn_menu" || msg.includes("back")) {
-            await sendMainMenu();
-            return;
-        }
-    }
-
-    // Default Back or Global Menu fallback
-    if (msg.includes("back") || msg.includes("menu")) {
-        await sendMainMenu();
+    // Option 1: Shop Products
+    if (msg === "btn_shop" || msg === "1" || msg.includes("shop") || msg.includes("product")) {
+        await sendInteractiveButtons(phone, `🛍️ *Mansara Foods — Shop Products*\n\nExplore our wide range of authentic products:\n\n1️⃣ 🌾 Traditional Rice & Grains\n2️⃣ 🌶️ Authentic Spices & Masalas\n3️⃣ 🍿 Healthy Snacks & Savouries\n4️⃣ 🍯 Pure Honey, Ghee & Oils\n\nReply with a number or select an option below:`, [
+            { id: "btn_orders", title: "2 - Orders" },
+            { id: "btn_business", title: "3 - Business" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
         return;
     }
 
-    // Fallback menu
-    await sendMainMenu();
+    // Option 2: Orders
+    if (msg === "btn_orders" || msg === "2" || msg.includes("order")) {
+        await sendInteractiveButtons(phone, `📦 *Mansara Foods — Orders & Tracking*\n\nHow can we help with your order?\n\n1️⃣ Track Existing Order\n2️⃣ Cancel / Modify Order\n3️⃣ Shipping & Delivery Info\n\nPlease reply with your Order ID or select an option below:`, [
+            { id: "btn_shop", title: "1 - Shop Products" },
+            { id: "btn_business", title: "3 - Business" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+
+    // Option 3: Business (Dealers & Bulk Orders)
+    if (msg === "btn_business" || msg === "3" || msg.includes("business") || msg.includes("dealer") || msg.includes("bulk")) {
+        await sendInteractiveButtons(phone, `🏢 *Mansara Foods — Business & Bulk Orders*\n\nPartner with Mansara Foods!\n\n✅ Wholesale Pricing\n✅ Distributorship & Dealership\n✅ Direct Factory Supply & Exports\n\n📞 *Call Business Desk:* +91 96000 67611\n📧 *Email:* business@mansarafoods.com\n\nPlease reply with your Name & Business Location:`, [
+            { id: "btn_shop", title: "1 - Shop Products" },
+            { id: "btn_orders", title: "2 - Orders" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+
+    // Option 4: Help & Support
+    if (msg === "btn_support" || msg === "4" || msg.includes("help") || msg.includes("support")) {
+        contact.is_paused = true;
+        await contact.save();
+        await sendInteractiveButtons(phone, `💬 *Mansara Foods — Help & Support*\n\nOur team is happy to assist you! 🙏\n\n📞 *Call/WhatsApp:* +91 96000 67611\n📧 *Email:* support@mansarafoods.com\n⏰ *Working Hours:* Mon – Sat (9 AM – 6 PM)\n\nAn agent will respond to you shortly!`, [
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+
+    // Main Menu
+    if (msg === "btn_menu" || msg.includes("main menu") || msg.includes("back")) {
+        const welcomeText = `👋 Welcome to Mansara Foods!
+
+We're happy to serve you.
+
+Please choose an option below:
+
+1️⃣ Shop Products
+2️⃣ Orders
+3️⃣ Business (Dealers & Bulk Orders)
+4️⃣ Help & Support`;
+
+        await sendInteractiveButtons(phone, welcomeText, [
+            { id: "btn_shop", title: "1 - Shop Products" },
+            { id: "btn_orders", title: "2 - Orders" },
+            { id: "btn_business", title: "3 - Business" }
+        ]);
+        return;
+    }
+
+    // Fallback
+    const welcomeText = `👋 Welcome to Mansara Foods!
+
+We're happy to serve you.
+
+Please choose an option below:
+
+1️⃣ Shop Products
+2️⃣ Orders
+3️⃣ Business (Dealers & Bulk Orders)
+4️⃣ Help & Support`;
+
+    await sendInteractiveButtons(phone, welcomeText, [
+        { id: "btn_shop", title: "1 - Shop Products" },
+        { id: "btn_orders", title: "2 - Orders" },
+        { id: "btn_business", title: "3 - Business" }
+    ]);
 }
 
 // --- Cron Jobs for Automated Follow-ups ---
