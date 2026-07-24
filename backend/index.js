@@ -247,67 +247,6 @@ async function getMetaUserProfile(senderId, platform) {
 }
 
 // --- Send Message Functions ---
-async function sendImageMessage(to, imageUrl, caption = '') {
-    if (to.startsWith('fb:') || to.startsWith('ig:')) return;
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN || !imageUrl) return;
-    try {
-        const response = await axios({
-            method: 'POST',
-            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
-            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-            data: {
-                messaging_product: 'whatsapp',
-                to: to,
-                type: 'image',
-                image: { link: imageUrl, caption: caption }
-            }
-        });
-        console.log(`✅ [WhatsApp Image Sent] Sent to ${to}, ID: ${response.data?.messages?.[0]?.id}`);
-    } catch (error) {
-        console.error("❌ [WhatsApp Image Error]:", error.response ? JSON.stringify(error.response.data) : error.message);
-    }
-}
-
-async function sendImageWithButtons(to, imageUrl, bodyText, buttonsArray) {
-    if (to.startsWith('fb:') || to.startsWith('ig:')) {
-        await sendMetaQuickReplies(to, bodyText, buttonsArray);
-        return;
-    }
-
-    if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) return;
-    const buttons = buttonsArray.map((btn) => ({
-        type: "reply",
-        reply: { id: btn.id, title: btn.title.substring(0, 20) }
-    }));
-
-    try {
-        const response = await axios({
-            method: 'POST',
-            url: `https://graph.facebook.com/v20.0/${PHONE_NUMBER_ID}/messages`,
-            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
-            data: {
-                messaging_product: 'whatsapp',
-                to: to,
-                type: 'interactive',
-                interactive: {
-                    type: 'button',
-                    header: {
-                        type: 'image',
-                        image: { link: imageUrl }
-                    },
-                    body: { text: bodyText },
-                    action: { buttons }
-                }
-            }
-        });
-        console.log(`✅ [WhatsApp Image+Buttons Sent] Sent to ${to}, ID: ${response.data?.messages?.[0]?.id}`);
-    } catch (error) {
-        console.warn("⚠️ [Image Header Fallback] Sending image then interactive buttons...");
-        await sendImageMessage(to, imageUrl);
-        await sendInteractiveButtons(to, bodyText, buttonsArray);
-    }
-}
-
 async function sendMessage(to, text) {
     if (to.startsWith('fb:') || to.startsWith('ig:')) {
         await sendMetaMessage(to, text);
@@ -535,104 +474,162 @@ async function handleBotReply(phone, messageText, contact) {
     const isWelcome = msg.includes("hi") || msg.includes("hello") || msg.includes("hey") || msg.includes("start") || msg.includes("hai") || msg.includes("vanakkam") || contact.messageCount === 1;
 
     if (isWelcome) {
-        const welcomeText = `👋 Welcome to Mansara Foods!
+        const welcomeText = `🏗️ Welcome to Deepika Builtech Engineering!
 
-We're happy to serve you.
+Tamil Nadu's most trusted Pre-Engineered Building specialists — based in Chennai.
 
-Please choose an option below:
+🏆 Excellence Award 2025
+✅ 15+ Years of Experience
+✅ 250+ Projects Delivered
+✅ 200+ Happy Clients
+✅ 3 Manufacturing Units in Tamil Nadu
 
-1️⃣ Shop Products
-2️⃣ Orders
-3️⃣ Business (Dealers & Bulk Orders)
-4️⃣ Help & Support`;
+Please select an option:
 
-        const imageUrl = process.env.WELCOME_IMAGE_URL || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800';
+1️⃣ About Us
+2️⃣ Our Services
+3️⃣ Get a Free Quote
+4️⃣ Contact & Locations
 
-        await sendImageWithButtons(phone, imageUrl, welcomeText, [
-            { id: "btn_shop", title: "1 - Shop Products" },
-            { id: "btn_orders", title: "2 - Orders" },
-            { id: "btn_business", title: "3 - Business" }
-        ]);
-        return;
-    }
-
-    // Option 1: Shop Products
-    if (msg === "btn_shop" || msg === "1" || msg.includes("shop") || msg.includes("product")) {
-        await sendInteractiveButtons(phone, `🛍️ *Mansara Foods — Shop Products*\n\nExplore our wide range of authentic products:\n\n1️⃣ 🌾 Traditional Rice & Grains\n2️⃣ 🌶️ Authentic Spices & Masalas\n3️⃣ 🍿 Healthy Snacks & Savouries\n4️⃣ 🍯 Pure Honey, Ghee & Oils\n\nReply with a number or select an option below:`, [
-            { id: "btn_orders", title: "2 - Orders" },
-            { id: "btn_business", title: "3 - Business" },
-            { id: "btn_menu", title: "Main Menu" }
-        ]);
-        return;
-    }
-
-    // Option 2: Orders
-    if (msg === "btn_orders" || msg === "2" || msg.includes("order")) {
-        await sendInteractiveButtons(phone, `📦 *Mansara Foods — Orders & Tracking*\n\nHow can we help with your order?\n\n1️⃣ Track Existing Order\n2️⃣ Cancel / Modify Order\n3️⃣ Shipping & Delivery Info\n\nPlease reply with your Order ID or select an option below:`, [
-            { id: "btn_shop", title: "1 - Shop Products" },
-            { id: "btn_business", title: "3 - Business" },
-            { id: "btn_menu", title: "Main Menu" }
-        ]);
-        return;
-    }
-
-    // Option 3: Business (Dealers & Bulk Orders)
-    if (msg === "btn_business" || msg === "3" || msg.includes("business") || msg.includes("dealer") || msg.includes("bulk")) {
-        await sendInteractiveButtons(phone, `🏢 *Mansara Foods — Business & Bulk Orders*\n\nPartner with Mansara Foods!\n\n✅ Wholesale Pricing\n✅ Distributorship & Dealership\n✅ Direct Factory Supply & Exports\n\n📞 *Call Business Desk:* +91 96000 67611\n📧 *Email:* business@mansarafoods.com\n\nPlease reply with your Name & Business Location:`, [
-            { id: "btn_shop", title: "1 - Shop Products" },
-            { id: "btn_orders", title: "2 - Orders" },
-            { id: "btn_menu", title: "Main Menu" }
-        ]);
-        return;
-    }
-
-    // Option 4: Help & Support
-    if (msg === "btn_support" || msg === "4" || msg.includes("help") || msg.includes("support")) {
-        contact.is_paused = true;
-        await contact.save();
-        await sendInteractiveButtons(phone, `💬 *Mansara Foods — Help & Support*\n\nOur team is happy to assist you! 🙏\n\n📞 *Call/WhatsApp:* +91 96000 67611\n📧 *Email:* support@mansarafoods.com\n⏰ *Working Hours:* Mon – Sat (9 AM – 6 PM)\n\nAn agent will respond to you shortly!`, [
-            { id: "btn_menu", title: "Main Menu" }
-        ]);
-        return;
-    }
-
-    // Main Menu
-    if (msg === "btn_menu" || msg.includes("main menu") || msg.includes("back")) {
-        const welcomeText = `👋 Welcome to Mansara Foods!
-
-We're happy to serve you.
-
-Please choose an option below:
-
-1️⃣ Shop Products
-2️⃣ Orders
-3️⃣ Business (Dealers & Bulk Orders)
-4️⃣ Help & Support`;
+Reply with a number or tap a button
+😊`;
 
         await sendInteractiveButtons(phone, welcomeText, [
-            { id: "btn_shop", title: "1 - Shop Products" },
-            { id: "btn_orders", title: "2 - Orders" },
-            { id: "btn_business", title: "3 - Business" }
+            { id: "btn_about", title: "1 - About Us" },
+            { id: "btn_services", title: "2 - Services" },
+            { id: "btn_quote", title: "3 - Free Quote" }
+        ]);
+        return;
+    }
+
+    if (msg === "btn_about" || msg === "1" || msg.includes("about")) {
+        await sendInteractiveButtons(phone, `🏢 *About Deepika Builtech Engineering*\n\nWe are a leading Pre-Engineered Building (PEB) construction company headquartered in Ambattur, Chennai — with 15+ years of trusted service across Tamil Nadu.\n\n🏭 *What We Build:*\nWe design, fabricate and erect high-quality PEB structures, warehouses, cold storages, mezzanine floors, industrial sheds and godowns — completely under one roof.\n\n📍 *Our 3 Locations:*\n- Head Office — Ambattur, Chennai\n- Unit I — Kanchipuram District  \n- Unit II — Thirumullaivoyal, Thiruvallur\n\n🏆 *Why 200+ Clients Choose Us:*\n✅ In-house manufacturing — no middlemen\n✅ On-time delivery — every single project\n✅ Transparent pricing — zero hidden costs\n✅ CNC precision steel fabrication\n✅ End-to-end project management\n✅ Excellence Award 2025 winner\n\nWhat would you like to do next?\n\n*1️⃣ View Our Services*\n*2️⃣ Get a Free Quote*\n*3️⃣ Back to Main Menu*`, [
+            { id: "btn_services", title: "View Services" },
+            { id: "btn_quote", title: "Get Free Quote" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+
+    if (msg === "btn_services" || msg === "2" || msg.includes("service") || msg === "view services") {
+        const sections = [
+            {
+                title: "Construction Services",
+                rows: [
+                    { id: "srv_peb", title: "🏗️ PEB Structure", description: "Pre-Engineered Buildings" },
+                    { id: "srv_mezzanine", title: "📦 Mezzanine Floor", description: "Custom space expansion" },
+                    { id: "srv_cold", title: "❄️ Cold Storage", description: "Insulated facilities" },
+                    { id: "srv_shed", title: "🏚️ Shed Fabrication", description: "Industrial sheds" },
+                    { id: "srv_godown", title: "🏭 Godown Construction", description: "Large warehouses" },
+                    { id: "srv_civil", title: "🧱 Civil Construction", description: "Foundation & RC works" }
+                ]
+            },
+            {
+                title: "Actions",
+                rows: [
+                    { id: "btn_quote", title: "📋 Get a Free Quote" },
+                    { id: "btn_menu", title: "🏠 Main Menu" }
+                ]
+            }
+        ];
+
+        await sendInteractiveList(
+            phone, 
+            `🔧 *Our Services*\n\nWe specialise in the following construction services across Tamil Nadu.\n\nTap the button below to view and select a service:`, 
+            "View Services", 
+            sections
+        );
+        return;
+    }
+
+    if (msg === "4" || msg.includes("contact") || msg.includes("location") || msg.includes("address")) {
+        await sendInteractiveButtons(phone, `📞 *Contact Deepika Builtech Engineering*\n\n*📱 Call or WhatsApp:*\n+91 96000 67611\n+91 98844 87938\n\n*📧 Email:*\ndbtechengg@gmail.com\n\n*🌐 Website:*\ndeepikabuiltech.com\n\n*📍 Our 3 Locations:*\n\n*Head Office — Chennai:*\nSIDCO Industrial Estate\nAmbattur, Chennai — 600098\n\n*Unit I — Kanchipuram:*\nRajakulam Road\nKanchipuram District — 631561\n\n*Unit II — Thiruvallur:*\nSIDCO Industrial Estate\nThirumullaivoyal — 600062\n\n*🕐 Working Hours:*\nMonday – Saturday: 9 AM – 6 PM\n\nWhat would you like to do?`, [
+            { id: "btn_quote", title: "Get Free Quote 📋" },
+            { id: "btn_services", title: "View Services 🔧" },
+            { id: "btn_menu", title: "Main Menu 🏠" }
+        ]);
+        return;
+    }
+
+    // Services Selection (1 to 6 from services menu)
+    if (msg === "srv_peb" || msg.includes("peb")) {
+        contact.selected_service = "PEB Structure"; await contact.save();
+        await sendInteractiveButtons(phone, `🏗️ *Pre-Engineered Buildings (PEB)*\n\nThe fastest, strongest, and most cost-effective way to build your factory, warehouse, or industrial facility.\n\n💡 *Why Choose PEB Over RCC?*\n✅ 30–40% cheaper than RCC construction\n✅ Built and ready in just 30–45 days\n✅ Earthquake and cyclone resistant\n✅ Fully customisable — any span, height or layout\n✅ Low maintenance — long-lasting galvanised steel\n✅ Future-ready — easily expandable\n\n🏭 *Best Suited For:*\nFactories · Warehouses · Industrial Sheds · Distribution Centres · Manufacturing Plants · Steel Buildings\n\n📌 We handle everything:\nDesign → Fabrication → Transport → Erection → Handover\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+    if (msg === "srv_mezzanine" || msg.includes("mezzanine")) {
+        contact.selected_service = "Mezzanine Floor"; await contact.save();
+        await sendInteractiveButtons(phone, `📦 *Mezzanine Floor Construction*\n\nMaximise your existing space without building a new facility. A mezzanine floor doubles your usable area at a fraction of the cost.\n\n✅ Custom designed for your exact space\n✅ Heavy load-bearing structural capacity\n✅ Safe staircase and handrail included\n✅ Quick installation with minimal disruption\n✅ Perfect for storage, offices or production\n\n💡 *Did You Know?*\nA well-designed mezzanine can give you 70–80% extra usable space within your existing building!\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+    if (msg === "srv_cold" || msg.includes("cold") || msg.includes("storage")) {
+        contact.selected_service = "Cold Storage"; await contact.save();
+        await sendInteractiveButtons(phone, `❄️ *Cold Storage Construction*\n\nWe design and build insulated cold storage facilities engineered for precise temperature control and maximum energy efficiency.\n\n✅ PUF panel insulated walls, floors and ceiling\n✅ Single and multi-temperature chamber options\n✅ Blast freezer and chilling room combinations\n✅ Designed for FSSAI and food safety compliance\n✅ Integrated refrigeration system support\n✅ Anti-condensation and drainage systems\n\n🏭 *Best For:*\nFood Processing · Pharmaceuticals · Dairy · Seafood · Agriculture · Vegetables and Fruits\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+    if (msg === "srv_shed" || msg.includes("shed")) {
+        contact.selected_service = "Shed Fabrication"; await contact.save();
+        await sendInteractiveButtons(phone, `🏚️ *Shed Fabrication*\n\nWe fabricate and erect high-quality industrial sheds for workshops, storage, vehicle parking, and light manufacturing operations.\n\n✅ MS and galvanised steel fabrication\n✅ Custom size and height options\n✅ Fast erection — minimal site time\n✅ Roofing sheet options — GI, colour coated\n✅ Side cladding and ventilation included\n✅ Strong and durable — built to last 25+ years\n\n💡 *Ideal for:*\nVehicle Sheds · Tool Rooms · Small Workshops · Agricultural Storage · Pump Houses\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+    if (msg === "srv_godown" || msg.includes("godown")) {
+        contact.selected_service = "Godown Construction"; await contact.save();
+        await sendInteractiveButtons(phone, `🏭 *Godown Construction*\n\nWe build robust, large-span godowns and warehouses for commercial and industrial storage operations across Tamil Nadu.\n\n✅ Clear span up to 60+ metres — no interior columns\n✅ High-bay storage compatible design\n✅ Natural ventilation and lighting options\n✅ Dock levellers and loading bay options\n✅ Fire safety and sprinkler ready\n✅ Completed in 45–60 days\n\n💡 *Perfect For:*\nFMCG Storage · Logistics Hubs · Raw Material Storage · Finished Goods · E-Commerce Fulfilment Centres\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+    if (msg === "srv_civil" || msg.includes("civil")) {
+        contact.selected_service = "Civil Construction"; await contact.save();
+        await sendInteractiveButtons(phone, `🧱 *Civil Construction*\n\nWe provide complete civil construction services alongside our PEB and steel fabrication work — giving you one trusted contractor for your entire project.\n\n✅ Foundation and footing works\n✅ RCC column and slab construction\n✅ Compound wall and boundary wall\n✅ Office block and admin building\n✅ Toilet block and utility construction\n✅ Flooring — plain cement and epoxy\n\n💡 *Advantage:*\nWhen you combine our civil and PEB services, you get seamless coordination, single-point accountability, and significant cost savings.\n\nInterested in a free estimate?`, [
+            { id: "btn_quote", title: "Yes-Get Free Quote" },
+            { id: "btn_services", title: "Back to Services" },
+            { id: "btn_menu", title: "Main Menu" }
+        ]);
+        return;
+    }
+
+    // Trigger Quote Flow (from "3" in main menu, or "Get Free Quote" button)
+    if (msg === "btn_quote" || msg === "3" || msg.includes("quote") || msg.includes("yes")) {
+        contact.quote_step = 1;
+        if (!contact.selected_service) contact.selected_service = "PEB / General Enquiry";
+        await contact.save();
+        await sendMessage(phone, `📋 *Let's get your FREE project estimate!*\n\nThis will take less than 2 minutes. 🕐\n\nOur expert team will prepare a detailed quotation based on your requirements.\n\n━━━━━━━━━━━━━━━━━\n❓ *Question 1 of 4*\n\n*What is the total area you need for your project?*\n\n_Please type your answer_\n_(Example: 5,000 sq ft · 10,000 sq ft · 1 acre · 2 grounds)_`);
+        return;
+    }
+
+    if (msg === "btn_menu" || msg.includes("main menu") || msg.includes("back to")) {
+        await sendInteractiveButtons(phone, `Main Menu`, [
+            { id: "btn_about", title: "1 - About Us" },
+            { id: "btn_services", title: "2 - Services" },
+            { id: "btn_quote", title: "3 - Free Quote" }
         ]);
         return;
     }
 
     // Fallback
-    const welcomeText = `👋 Welcome to Mansara Foods!
-
-We're happy to serve you.
-
-Please choose an option below:
-
-1️⃣ Shop Products
-2️⃣ Orders
-3️⃣ Business (Dealers & Bulk Orders)
-4️⃣ Help & Support`;
-
-    await sendInteractiveButtons(phone, welcomeText, [
-        { id: "btn_shop", title: "1 - Shop Products" },
-        { id: "btn_orders", title: "2 - Orders" },
-        { id: "btn_business", title: "3 - Business" }
+    await sendInteractiveButtons(phone, `😊 *Thank you for your message!*\n\nI didn't quite understand that. Let me show you our main menu so I can help you better.\n\n*1️⃣ About Us*\n*2️⃣ Our Services*\n*3️⃣ Get a Free Quote*\n*4️⃣ Contact & Locations*\n*5️⃣ 💬 Talk to a Human*\n\n_Reply with a number or tap a button_ 👇`, [
+        { id: "btn_menu", title: "Main Menu" },
+        { id: "btn_quote", title: "Get Free Quote" },
+        { id: "btn_human", title: "Talk to Human" }
     ]);
 }
 
